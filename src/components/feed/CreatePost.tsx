@@ -6,7 +6,11 @@ import { uploadToCloudinary } from "@/lib/cloudinary";
 import { Image as ImageIcon, Send, X } from "lucide-react";
 import { useRef, useState } from "react";
 
-export default function CreatePost() {
+interface CreatePostProps {
+    petId?: string;
+}
+
+export default function CreatePost({ petId }: CreatePostProps) {
     const { user } = useAuth();
     const { addPost } = useSocial();
 
@@ -50,7 +54,7 @@ export default function CreatePost() {
             }
 
             // 2. Create Post
-            await addPost(newPostText, imageUrl);
+            await addPost(newPostText, imageUrl, petId);
 
             // 3. Reset Form
             setNewPostText("");

@@ -3,7 +3,7 @@
 import { ChatProvider, useChat } from "@/context/ChatContext";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState, useRef, Suspense } from "react";
-import { ArrowLeft, Send, Image as ImageIcon, Search, Phone, Video, Info, MoreVertical } from "lucide-react";
+import { ArrowLeft, Send, Image as ImageIcon, Search, Phone, Video, Info, MoreVertical, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 
@@ -11,12 +11,15 @@ import Image from "next/image";
 // SUB-COMPONENTS
 // ===========================================
 
-function ChatSidebar() {
+function ChatSidebar({ isOpen }: { isOpen: boolean }) {
     const { conversations, activeConversationId, setActiveConversationId, isLoading, onlineUsers } = useChat();
     const router = useRouter();
 
     return (
-        <div className={`w-full md:w-80 lg:w-96 border-r border-gray-100 bg-white flex flex-col h-full ${activeConversationId ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`w-full md:w-80 lg:w-96 border-r border-gray-100 bg-white flex flex-col h-full 
+            ${activeConversationId ? 'hidden' : 'flex'} 
+            md:flex ${isOpen ? '' : 'md:hidden'} 
+            transition-all duration-300 ease-in-out`}>
             <div className="p-4 border-b border-gray-50 flex items-center justify-between sticky top-0 bg-white z-10">
                 <div className="flex items-center gap-3">
                     <button onClick={() => router.push('/')} className="md:hidden">
@@ -98,7 +101,7 @@ function ChatSidebar() {
     );
 }
 
-function ChatWindow() {
+function ChatWindow({ toggleSidebar, isSidebarOpen }: { toggleSidebar: () => void, isSidebarOpen: boolean }) {
     const { activeConversation, messages, sendMessage, setActiveConversationId, onlineUsers } = useChat();
     const { user } = useAuth();
     const [newMessage, setNewMessage] = useState("");
@@ -154,6 +157,12 @@ function ChatWindow() {
                     <button onClick={() => setActiveConversationId(null)} className="md:hidden">
                         <ArrowLeft className="w-5 h-5 text-gray-500" />
                     </button>
+
+                    {/* Desktop Sidebar Toggle */}
+                    <button onClick={toggleSidebar} className="hidden md:flex p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors" title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}>
+                        {isSidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+                    </button>
+
                     <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-100 relative">
                         <Image src={otherUser.avatar} alt={otherUser.name} fill className="object-cover" />
                     </div>
@@ -251,6 +260,7 @@ function ChatContent() {
     const searchParams = useSearchParams();
     const { startConversation, isLoading } = useChat();
     const userIdToStart = searchParams.get('user');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     useEffect(() => {
         // Only attempt to start conversation if we have an authenticated user and the target ID
@@ -280,8 +290,8 @@ function ChatContent() {
 
     return (
         <div className="flex h-[calc(100vh-theme(spacing.16))] bg-white md:rounded-2xl md:shadow-soft md:border md:border-gray-100 overflow-hidden md:mx-4 md:mb-4">
-            <ChatSidebar />
-            <ChatWindow />
+            <ChatSidebar isOpen={isSidebarOpen} />
+            <ChatWindow toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen} />
         </div>
     );
 }

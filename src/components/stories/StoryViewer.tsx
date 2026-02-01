@@ -5,6 +5,7 @@ import { X, MoreVertical, Trash2, Heart, PlusCircle } from "lucide-react";
 import { Story, useSocial } from "@/context/SocialContext";
 import { useAuth } from "@/context/AuthContext";
 import CreateHighlightModal from "../profile/CreateHighlightModal";
+import Link from "next/link";
 
 interface StoryViewerProps {
     stories: Story[];
@@ -99,19 +100,23 @@ export default function StoryViewer({ stories, onClose, highlightId }: StoryView
                 <X className="w-6 h-6" />
             </button>
 
-            {/* User Info */}
-            <div className="absolute top-8 left-4 flex items-center gap-3 z-20 pointer-events-none">
-                <img
-                    src={activeStory.userAvatar}
-                    alt={activeStory.userName}
-                    className="w-10 h-10 rounded-full border-2 border-white"
-                />
-                <span className="text-white font-bold text-sm shadow-black drop-shadow-md">
-                    {activeStory.userName}
-                </span>
-                <span className="text-gray-300 text-xs shadow-black drop-shadow-md">
-                    {new Date(activeStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+            {/* User Info - Clickable */}
+            <div className="absolute top-8 left-4 z-30 flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                <Link href={`/profile/${activeStory.userId}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <img
+                        src={activeStory.userAvatar}
+                        alt={activeStory.userName}
+                        className="w-10 h-10 rounded-full border-2 border-white"
+                    />
+                    <div className="flex flex-col">
+                        <span className="text-white font-bold text-sm shadow-black drop-shadow-md leading-none">
+                            {activeStory.userName}
+                        </span>
+                        <span className="text-gray-300 text-xs shadow-black drop-shadow-md mt-0.5">
+                            {new Date(activeStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
+                </Link>
             </div>
 
             {/* More Options (Only for me) */}

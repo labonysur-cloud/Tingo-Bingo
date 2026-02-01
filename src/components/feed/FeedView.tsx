@@ -244,13 +244,17 @@ export default function FeedView() {
                                             <div className="px-4 py-3 max-h-64 overflow-y-auto space-y-3">
                                                 {post.comments.map((comment) => (
                                                     <div key={comment.id} className="flex gap-2">
-                                                        <img
-                                                            src={comment.userAvatar}
-                                                            alt={comment.userName}
-                                                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                                                        />
+                                                        <Link href={`/profile/${comment.userId}`}>
+                                                            <img
+                                                                src={comment.userAvatar}
+                                                                alt={comment.userName}
+                                                                className="w-8 h-8 rounded-full object-cover flex-shrink-0 hover:opacity-80 transition-opacity"
+                                                            />
+                                                        </Link>
                                                         <div className="flex-1 bg-white rounded-2xl px-3 py-2 shadow-sm">
-                                                            <p className="font-bold text-sm text-gray-900">{comment.userName}</p>
+                                                            <Link href={`/profile/${comment.userId}`}>
+                                                                <p className="font-bold text-sm text-gray-900 hover:underline">{comment.userName}</p>
+                                                            </Link>
                                                             <p className="text-gray-700 text-sm">{comment.text}</p>
                                                         </div>
                                                     </div>

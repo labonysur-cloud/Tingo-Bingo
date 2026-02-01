@@ -7,7 +7,7 @@ import { auth } from "@/lib/firebase";
 import { supabase } from "@/lib/supabase";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { updateProfile } from "firebase/auth";
-import { ArrowLeft, Camera, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, Save, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 export default function EditProfilePage() {
@@ -28,8 +28,11 @@ export default function EditProfilePage() {
     const [avatar, setAvatar] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar || null);
 
-    // Form State - Pet
-    const [petId, setPetId] = useState<string | null>(null);
+    // Form State - Pets (Multi-Pet System)
+    const [myPets, setMyPets] = useState<any[]>([]);
+    const [activePetId, setActivePetId] = useState<string | 'new'>('new'); // 'new' or UUID
+
+    // Current Pet Form State
     const [petName, setPetName] = useState("");
     const [petSpecies, setPetSpecies] = useState("cat");
     const [petBreed, setPetBreed] = useState("");
@@ -39,10 +42,9 @@ export default function EditProfilePage() {
     const [petAvatar, setPetAvatar] = useState<File | null>(null);
     const [petAvatarPreview, setPetAvatarPreview] = useState<string | null>(null);
 
-    // Load initial data from Supabase
+    // Load initial data
     useEffect(() => {
         const loadUserData = async () => {
-            if (!user) return;
             if (!user) return;
             try {
                 // 1. Get User Data
@@ -62,37 +64,20 @@ export default function EditProfilePage() {
                     setAvatarPreview(prev => userData.avatar || prev);
                 }
 
-                // 2. Get Pet Data (Primary or First)
-                let targetPetId = userData?.primary_pet_id;
+                // 2. Get All Pets
+                const { data: pets } = await supabase
+                    .from('pets')
+                    .select('*')
+                    .eq('owner_id', user.id)
+                    .order('created_at', { ascending: true }); // Oldest first (usually primary)
 
-                if (!targetPetId) {
-                    // Try to find any pet
-                    const { data: pets } = await supabase
-                        .from('pets')
-                        .select('id')
-                        .eq('owner_id', user.id)
-                        .limit(1);
-
-                    if (pets && pets.length > 0) targetPetId = pets[0].id;
-                }
-
-                if (targetPetId) {
-                    const { data: petData, error: petError } = await supabase
-                        .from('pets')
-                        .select('*')
-                        .eq('id', targetPetId)
-                        .single();
-
-                    if (petData) {
-                        setPetId(petData.id);
-                        setPetName(petData.name || "");
-                        setPetSpecies(petData.species || "cat");
-                        setPetBreed(petData.breed || "");
-                        setPetAge(petData.age || "");
-                        setPetGender(petData.gender || "unknown");
-                        setPetBio(petData.bio || "");
-                        setPetAvatarPreview(petData.avatar || null);
-                    }
+                if (pets && pets.length > 0) {
+                    setMyPets(pets);
+                    // Select the first pet by default
+                    selectPet(pets[0]);
+                } else {
+                    setMyPets([]);
+                    resetPetForm(); // Ready to add first pet
                 }
 
             } catch (err) {
@@ -109,9 +94,29 @@ export default function EditProfilePage() {
         }
     }, [user]);
 
-    // ... 
+    const selectPet = (pet: any) => {
+        setActivePetId(pet.id);
+        setPetName(pet.name || "");
+        setPetSpecies(pet.species || "cat");
+        setPetBreed(pet.breed || "");
+        setPetAge(pet.age || "");
+        setPetGender(pet.gender || "unknown");
+        setPetBio(pet.bio || "");
+        setPetAvatarPreview(pet.avatar || null);
+        setPetAvatar(null); // Reset file input
+    };
 
-    // ... 
+    const resetPetForm = () => {
+        setActivePetId('new');
+        setPetName("");
+        setPetSpecies("cat");
+        setPetBreed("");
+        setPetAge("");
+        setPetGender("unknown");
+        setPetBio("");
+        setPetAvatarPreview(null);
+        setPetAvatar(null);
+    };
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, isPet: boolean = false) => {
         if (e.target.files && e.target.files[0]) {
@@ -126,6 +131,36 @@ export default function EditProfilePage() {
         }
     };
 
+    const handleDeletePet = async () => {
+        if (activePetId === 'new' || !confirm("Are you sure you want to delete this pet? This cannot be undone.")) return;
+
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('pets')
+                .delete()
+                .eq('id', activePetId);
+
+            if (error) throw error;
+
+            // Remove from list
+            const updatedPets = myPets.filter(p => p.id !== activePetId);
+            setMyPets(updatedPets);
+
+            if (updatedPets.length > 0) {
+                selectPet(updatedPets[0]);
+            } else {
+                resetPetForm();
+            }
+            alert("Pet deleted.");
+        } catch (error) {
+            console.error("Error deleting pet:", error);
+            alert("Failed to delete pet.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user) return;
@@ -134,26 +169,19 @@ export default function EditProfilePage() {
         try {
             let photoURL = avatarPreview;
 
-            // 1. Upload new avatar if selected (Cloudinary auto-optimizes)
+            // 1. Upload Owner Avatar
             if (avatar) {
                 try {
-                    console.log("Starting image upload to Cloudinary...");
                     photoURL = await uploadToCloudinary(avatar);
-                    console.log("Image uploaded successfully:", photoURL);
-
-                    // Update Auth Profile
                     if (auth.currentUser) {
                         await updateProfile(auth.currentUser, { photoURL });
                     }
                 } catch (uploadError) {
                     console.error("Avatar upload failed:", uploadError);
-                    alert("Image upload failed. Saving other changes...");
                 }
             }
 
-            // 2. Update Supabase User Profile (Database)
-            console.log("Saving to Supabase...");
-
+            // 2. Update Owner Profile
             const { error: upsertError } = await supabase
                 .from('users')
                 .upsert({
@@ -165,68 +193,63 @@ export default function EditProfilePage() {
                     location,
                     avatar: photoURL,
                     updated_at: new Date().toISOString()
-                }, {
-                    onConflict: 'id'
-                });
+                }, { onConflict: 'id' });
 
-            if (upsertError) {
-                throw upsertError;
+            if (upsertError) throw upsertError;
+
+            // 3. Save Pet Data (Only if name is provided)
+            if (petName.trim()) {
+                console.log("Saving Pet Data...");
+                let petPhotoURL = petAvatarPreview;
+
+                if (petAvatar) {
+                    petPhotoURL = await uploadToCloudinary(petAvatar);
+                }
+
+                const petDataToSave = {
+                    owner_id: user.id,
+                    name: petName,
+                    species: petSpecies,
+                    breed: petBreed,
+                    age: petAge,
+                    gender: petGender,
+                    bio: petBio,
+                    avatar: petPhotoURL,
+                    updated_at: new Date().toISOString()
+                };
+
+                if (activePetId && activePetId !== 'new') {
+                    // Update Existing
+                    const { error: petUpdateError } = await supabase
+                        .from('pets')
+                        .update(petDataToSave)
+                        .eq('id', activePetId);
+                    if (petUpdateError) throw petUpdateError;
+                } else {
+                    // Insert New
+                    const { data: newPet, error: petInsertError } = await supabase
+                        .from('pets')
+                        .insert([{
+                            ...petDataToSave,
+                            is_primary: myPets.length === 0 // Make primary if it's the first one
+                        }])
+                        .select()
+                        .single();
+
+                    if (petInsertError) throw petInsertError;
+
+                    // Add to local list immediately
+                    setMyPets(prev => [...prev, newPet]);
+                    setActivePetId(newPet.id);
+
+                    // If it's the first pet, set as primary details in user
+                    if (myPets.length === 0) {
+                        await supabase.from('users').update({ primary_pet_id: newPet.id }).eq('id', user.id);
+                    }
+                }
             }
 
-            console.log("Supabase save complete!");
-
-            // 4. Save Pet Data
-            console.log("Saving Pet Data...");
-            let petPhotoURL = petAvatarPreview;
-
-            if (petAvatar) {
-                petPhotoURL = await uploadToCloudinary(petAvatar);
-            }
-
-            const petDataToSave = {
-                owner_id: user.id,
-                name: petName,
-                species: petSpecies,
-                breed: petBreed,
-                age: petAge,
-                gender: petGender,
-                bio: petBio,
-                avatar: petPhotoURL,
-                updated_at: new Date().toISOString()
-            };
-
-            let savedPetId = petId;
-
-            if (petId) {
-                // Update
-                const { error: petUpdateError } = await supabase
-                    .from('pets')
-                    .update(petDataToSave)
-                    .eq('id', petId);
-                if (petUpdateError) throw petUpdateError;
-            } else {
-                // Insert New
-                const { data: newPet, error: petInsertError } = await supabase
-                    .from('pets')
-                    .insert([{
-                        ...petDataToSave,
-                        is_primary: true // First pet is primary
-                    }])
-                    .select()
-                    .single();
-
-                if (petInsertError) throw petInsertError;
-                savedPetId = newPet.id;
-            }
-
-            // 5. Ensure Primary Pet is Set
-            const { error: userPetUpdateError } = await supabase
-                .from('users')
-                .update({ primary_pet_id: savedPetId })
-                .eq('id', user.id);
-            if (userPetUpdateError) throw userPetUpdateError;
-
-            alert("Profile & Pet Updated Successfully!");
+            alert("Saved successfully!");
             router.push("/profile");
 
         } catch (error: any) {
@@ -236,9 +259,6 @@ export default function EditProfilePage() {
             setLoading(false);
         }
     };
-
-    // REMOVED BLOCKING LOADER
-    // if (fetching) return <...Loader...>;
 
     return (
         <div className="min-h-screen bg-gray-50 pb-10">
@@ -267,127 +287,159 @@ export default function EditProfilePage() {
                             <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Camera className="w-8 h-8 text-white" />
                             </div>
-                            <div className="absolute bottom-0 right-0 bg-primary p-2 rounded-full shadow-lg border-2 border-white">
-                                <Camera className="w-4 h-4 text-white" />
-                            </div>
-                        </div>
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={(e) => handleFileSelect(e, false)}
-                            accept="image/*"
-                            className="hidden"
-                        />
-                    </div>
-
-                    {/* PET PROFILE SECTION */}
-                    <div className="space-y-4 bg-white p-6 rounded-2xl shadow-sm border border-orange-100 ring-4 ring-orange-50/50">
-                        <div className="flex items-center gap-3 border-b border-gray-100 pb-2 mb-4">
-                            <div className="w-2 h-8 bg-orange-500 rounded-full"></div>
-                            <h2 className="font-bold text-xl text-gray-900">Pet Profile</h2>
-                        </div>
-
-                        {/* Pet Avatar */}
-                        <div className="flex flex-col items-center mb-6">
-                            <div
-                                onClick={() => petFileInputRef.current?.click()}
-                                className="relative w-28 h-28 rounded-full cursor-pointer group"
-                            >
-                                <img
-                                    src={petAvatarPreview || `https://api.dicebear.com/7.x/notionists/svg?seed=${petName || 'pet'}`}
-                                    alt="Pet Avatar"
-                                    className="w-full h-full rounded-full object-cover border-4 border-orange-100 shadow-md bg-orange-50"
-                                />
-                                <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Camera className="w-8 h-8 text-white" />
-                                </div>
-                                <div className="absolute bottom-0 right-0 bg-orange-500 p-2 rounded-full shadow-lg border-2 border-white">
-                                    <Camera className="w-3 h-3 text-white" />
-                                </div>
-                            </div>
-                            <p className="text-xs text-orange-600 mt-2 font-medium">Tap to change pet photo</p>
                             <input
                                 type="file"
-                                ref={petFileInputRef}
-                                onChange={(e) => handleFileSelect(e, true)}
+                                ref={fileInputRef}
+                                onChange={(e) => handleFileSelect(e, false)}
                                 accept="image/*"
                                 className="hidden"
                             />
                         </div>
+                    </div>
 
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1.5">Pet Name</label>
-                            <input
-                                type="text"
-                                value={petName}
-                                onChange={(e) => setPetName(e.target.value)}
-                                className="modern-input border-orange-200 focus:border-orange-500 focus:ring-orange-200"
-                                placeholder="e.g. Fluffy"
-                            />
+                    {/* PET PROFILE SECTION */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-orange-100 ring-4 ring-orange-50/50">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-2 h-8 bg-orange-500 rounded-full"></div>
+                                <h2 className="font-bold text-xl text-gray-900">Pet Profiles</h2>
+                            </div>
+                            {/* Delete Button (if editing existing pet) */}
+                            {activePetId !== 'new' && (
+                                <button type="button" onClick={handleDeletePet} className="text-red-400 hover:text-red-500">
+                                    <Trash2 className="w-5 h-5" />
+                                </button>
+                            )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1.5">Species</label>
-                                <select
-                                    value={petSpecies}
-                                    onChange={(e) => setPetSpecies(e.target.value)}
-                                    className="modern-input"
+                        {/* Pet Selection List */}
+                        <div className="flex gap-4 overflow-x-auto pb-4 mb-4 scrollbar-hide">
+                            {/* "Add New" Button */}
+                            <button
+                                type="button"
+                                onClick={resetPetForm}
+                                className={`flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center transition-all ${activePetId === 'new'
+                                    ? 'bg-orange-500 text-white ring-2 ring-offset-2 ring-orange-500 shadow-lg scale-105'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                    }`}
+                            >
+                                <Plus className="w-8 h-8" />
+                            </button>
+
+                            {/* Existing Pets */}
+                            {myPets.map((pet) => (
+                                <div
+                                    key={pet.id}
+                                    onClick={() => selectPet(pet)}
+                                    className={`flex-shrink-0 relative cursor-pointer transition-all ${activePetId === pet.id
+                                        ? 'scale-105'
+                                        : 'opacity-70 hover:opacity-100'
+                                        }`}
                                 >
-                                    <option value="cat">Cat</option>
-                                    <option value="dog">Dog</option>
-                                    <option value="bird">Bird</option>
-                                    <option value="rabbit">Rabbit</option>
-                                    <option value="other">Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1.5">Gender</label>
-                                <select
-                                    value={petGender}
-                                    onChange={(e) => setPetGender(e.target.value)}
-                                    className="modern-input"
-                                >
-                                    <option value="unknown">Not Specified</option>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                </select>
-                            </div>
+                                    <div className={`w-16 h-16 rounded-full overflow-hidden border-2 ${activePetId === pet.id ? 'border-orange-500 ring-2 ring-offset-2 ring-orange-500' : 'border-gray-200'}`}>
+                                        <img src={pet.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${pet.name}`} className="w-full h-full object-cover" alt={pet.name} />
+                                    </div>
+                                    <p className="text-[10px] text-center mt-1 font-bold text-gray-600 truncate max-w-[64px]">{pet.name}</p>
+                                </div>
+                            ))}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
+                                {activePetId === 'new' ? 'Add New Pet' : `Editing ${petName}`}
+                            </h3>
+
+                            {/* Pet Avatar */}
+                            <div className="flex flex-col items-center mb-6">
+                                <div
+                                    onClick={() => petFileInputRef.current?.click()}
+                                    className="relative w-28 h-28 rounded-full cursor-pointer group"
+                                >
+                                    <img
+                                        src={petAvatarPreview || `https://api.dicebear.com/7.x/notionists/svg?seed=${petName || 'pet'}`}
+                                        alt="Pet Avatar"
+                                        className="w-full h-full rounded-full object-cover border-4 border-orange-100 shadow-md bg-orange-50"
+                                    />
+                                    <div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Camera className="w-8 h-8 text-white" />
+                                    </div>
+                                    <input
+                                        type="file"
+                                        ref={petFileInputRef}
+                                        onChange={(e) => handleFileSelect(e, true)}
+                                        accept="image/*"
+                                        className="hidden"
+                                    />
+                                </div>
+                                <p className="text-xs text-orange-600 mt-2 font-medium">Tap to change photo</p>
+                            </div>
+
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1.5">Breed</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-1.5">Pet Name</label>
                                 <input
                                     type="text"
-                                    value={petBreed}
-                                    onChange={(e) => setPetBreed(e.target.value)}
-                                    className="modern-input"
-                                    placeholder="e.g. Persian"
+                                    value={petName}
+                                    onChange={(e) => setPetName(e.target.value)}
+                                    className="modern-input border-orange-200 focus:border-orange-500 focus:ring-orange-200"
+                                    placeholder="e.g. Fluffy"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1.5">Age</label>
-                                <input
-                                    type="text"
-                                    value={petAge}
-                                    onChange={(e) => setPetAge(e.target.value)}
-                                    className="modern-input"
-                                    placeholder="e.g. 2 years"
-                                />
-                            </div>
-                        </div>
 
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1.5">Pet Bio / Personality</label>
-                            <textarea
-                                value={petBio}
-                                onChange={(e) => setPetBio(e.target.value)}
-                                className="modern-input min-h-[100px]"
-                                placeholder="Loves tuna, hates vacuums..."
-                            />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Species</label>
+                                    <select
+                                        value={petSpecies}
+                                        onChange={(e) => setPetSpecies(e.target.value)}
+                                        className="modern-input"
+                                    >
+                                        <option value="cat">Cat</option>
+                                        <option value="dog">Dog</option>
+                                        <option value="bird">Bird</option>
+                                        <option value="rabbit">Rabbit</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Gender</label>
+                                    <select
+                                        value={petGender}
+                                        onChange={(e) => setPetGender(e.target.value)}
+                                        className="modern-input"
+                                    >
+                                        <option value="unknown">Not Specified</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Breed</label>
+                                    <input
+                                        type="text"
+                                        value={petBreed}
+                                        onChange={(e) => setPetBreed(e.target.value)}
+                                        className="modern-input"
+                                        placeholder="e.g. Persian"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Age</label>
+                                    <input
+                                        type="text"
+                                        value={petAge}
+                                        onChange={(e) => setPetAge(e.target.value)}
+                                        className="modern-input"
+                                        placeholder="e.g. 2 years"
+                                    />
+                                </div>
+                            </div>
+
                         </div>
                     </div>
+
 
                     {/* Inputs */}
                     <div className="space-y-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -454,6 +506,6 @@ export default function EditProfilePage() {
                     </button>
                 </form>
             </main>
-        </div>
+        </div >
     );
 }
