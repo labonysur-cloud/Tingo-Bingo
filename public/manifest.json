@@ -1,0 +1,21 @@
+{
+  "name": "TingoBingo - The Pet Super App",
+  "short_name": "TingoBingo",
+  "description": "The ultimate social network and utility app for pet lovers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F7F7",
+  "theme_color": "#FF6B35",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

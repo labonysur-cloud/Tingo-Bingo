@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // TingoBingo uses Supabase for database, not Firestore
+    // Deny all access to prevent accidental usage
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
