@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, LayoutGrid, Siren, ShoppingBag, User, MessageCircle, Search } from "lucide-react";
+import { Home, LayoutGrid, Siren, ShoppingBag, User, MessageCircle, Search, Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
@@ -14,9 +14,9 @@ export default function BottomNav() {
 
     const navItems = [
         { label: "Home", href: "/", icon: Home },
-        { label: "Search", href: "/search", icon: Search },
+        { label: "Shop", href: "/shop", icon: ShoppingBag },
         { label: "SOS", href: "/sos", icon: Siren, highlight: true },
-        { label: "Messages", href: "/messages", icon: MessageCircle },
+        { label: "Chat", href: "/chat", icon: MessageCircle },
         { label: "Profile", href: "/profile", icon: User },
     ];
 

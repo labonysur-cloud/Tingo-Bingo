@@ -8,6 +8,7 @@ import { Heart, MessageCircle, Share2, Plus, Send, Sparkles, Gamepad2, MessageSq
 import CreatePost from "./CreatePost";
 import AddStoryModal from "../stories/AddStoryModal";
 import StoryViewer from "../stories/StoryViewer";
+import LikeButton from "../ui/LikeButton";
 import Link from "next/link";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -213,13 +214,12 @@ export default function FeedView() {
 
                                 {/* Actions */}
                                 <div className="p-4 pt-0 flex items-center gap-4 mt-2">
-                                    <button
+                                    <LikeButton
+                                        isLiked={post.isLikedByMe || false}
+                                        likesCount={post.likesCount || 0}
                                         onClick={() => likePost(post.id)}
-                                        className={`flex items-center gap-1.5 transition-colors ${post.isLikedByMe ? "text-red-500" : "text-gray-500 hover:text-red-500"}`}
-                                    >
-                                        <Heart className={`w-6 h-6 ${post.isLikedByMe ? "fill-current" : ""}`} />
-                                        <span className="font-bold text-sm">{post.likesCount || 0}</span>
-                                    </button>
+                                        size="md"
+                                    />
                                     <button
                                         onClick={() => {
                                             const newShowComments = { ...showComments };

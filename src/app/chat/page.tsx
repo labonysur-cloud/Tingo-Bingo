@@ -37,6 +37,8 @@ function ChatSidebar({ isOpen }: { isOpen: boolean }) {
                     <Search className="w-4 h-4 text-gray-400" />
                     <input
                         type="text"
+                        id="search-messages"
+                        name="search"
                         placeholder="Search messages..."
                         className="bg-transparent border-none outline-none text-sm w-full"
                     />
@@ -68,12 +70,11 @@ function ChatSidebar({ isOpen }: { isOpen: boolean }) {
                                     className={`w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left ${isActive ? 'bg-purple-50 border-r-2 border-purple-500' : ''}`}
                                 >
                                     <div className="relative">
-                                        <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-100 relative">
-                                            <Image
+                                        <div className="w-12 h-12 rounded-full overflow-hidden border border-gray-100">
+                                            <img
                                                 src={otherUser.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=unknown"}
                                                 alt={otherUser.name}
-                                                fill
-                                                className="object-cover"
+                                                className="w-full h-full object-cover"
                                             />
                                         </div>
                                         {/* Online indicator (Real) */}
@@ -163,8 +164,8 @@ function ChatWindow({ toggleSidebar, isSidebarOpen }: { toggleSidebar: () => voi
                         {isSidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
                     </button>
 
-                    <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-100 relative">
-                        <Image src={otherUser.avatar} alt={otherUser.name} fill className="object-cover" />
+                    <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-100">
+                        <img src={otherUser.avatar} alt={otherUser.name} className="w-full h-full object-cover" />
                     </div>
                     <div>
                         <h2 className="font-bold text-gray-900">{otherUser.name}</h2>
@@ -200,6 +201,8 @@ function ChatWindow({ toggleSidebar, isSidebarOpen }: { toggleSidebar: () => voi
                     <div className="flex-1 bg-gray-100 rounded-2xl px-4 py-2 flex items-center">
                         <input
                             type="text"
+                            id="message-input"
+                            name="message"
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
                             placeholder="Type a message..."
@@ -222,12 +225,29 @@ function ChatWindow({ toggleSidebar, isSidebarOpen }: { toggleSidebar: () => voi
 
 function MessageBubble({ message }: { message: any }) {
     const { user } = useAuth();
+    const { activeConversation } = useChat();
     if (!user) return null;
 
     const isMe = message.sender_id === user.id;
 
+    // Get sender info
+    const senderInfo = isMe
+        ? { name: user.name, avatar: user.avatar }
+        : activeConversation?.participants[0]?.user || { name: 'Unknown', avatar: '' };
+
     return (
-        <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+        <div className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'} items-end`}>
+            {/* Avatar for other user (left side) */}
+            {!isMe && (
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 flex-shrink-0">
+                    <img
+                        src={senderInfo.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=unknown"}
+                        alt={senderInfo.name}
+                        className="w-full h-full object-cover"
+                    />
+                </div>
+            )}
+
             <div className={`max-w-[70%] rounded-2xl px-4 py-3 ${isMe
                 ? 'bg-purple-600 text-white rounded-br-none'
                 : 'bg-white text-gray-800 border border-gray-100 shadow-sm rounded-bl-none'
@@ -247,6 +267,17 @@ function MessageBubble({ message }: { message: any }) {
                     {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
             </div>
+
+            {/* Avatar for current user (right side) */}
+            {isMe && (
+                <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 flex-shrink-0">
+                    <img
+                        src={user.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=me"}
+                        alt={user.name}
+                        className="w-full h-full object-cover"
+                    />
+                </div>
+            )}
         </div>
     );
 }
