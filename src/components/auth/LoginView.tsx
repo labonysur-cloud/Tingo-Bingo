@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { ArrowRight, Loader2, Chrome } from "lucide-react";
+import { ArrowRight, Loader2, Chrome, Mail, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function LoginView() {
-    const { login, signup, loginWithGoogle, user } = useAuth();
+    const { login, signup, loginWithGoogle, resetPassword } = useAuth();
     const router = useRouter();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState("");
@@ -14,6 +14,13 @@ export default function LoginView() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    // Forgot Password State
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [resetEmail, setResetEmail] = useState("");
+    const [resetLoading, setResetLoading] = useState(false);
+    const [resetSuccess, setResetSuccess] = useState(false);
+    const [resetError, setResetError] = useState("");
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -52,6 +59,28 @@ export default function LoginView() {
             console.error(err);
             setError("Google Sign-In failed. Try again.");
             setLoading(false);
+        }
+    };
+
+    const handleForgotPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setResetError("");
+        setResetLoading(true);
+
+        try {
+            await resetPassword(resetEmail);
+            setResetSuccess(true);
+        } catch (err: any) {
+            console.error(err);
+            if (err.message.includes("auth/invalid-email")) {
+                setResetError("Invalid email address.");
+            } else if (err.message.includes("auth/user-not-found")) {
+                setResetError("No account found with this email.");
+            } else {
+                setResetError("Failed to send reset email. Try again.");
+            }
+        } finally {
+            setResetLoading(false);
         }
     };
 
@@ -153,6 +182,16 @@ export default function LoginView() {
                     </button>
                 </form>
 
+                {/* Forgot Password Link */}
+                {isLogin && (
+                    <button
+                        onClick={() => setShowForgotPassword(true)}
+                        className="mt-4 text-sm text-gray-500 hover:text-primary transition-colors font-medium"
+                    >
+                        Forgot password?
+                    </button>
+                )}
+
                 <div className="mt-10 text-base text-gray-500 font-medium">
                     {isLogin ? "New to the pack?" : "Already a member?"}
                     <button
@@ -163,6 +202,93 @@ export default function LoginView() {
                     </button>
                 </div>
             </div>
+
+            {/* Forgot Password Modal */}
+            {showForgotPassword && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl relative">
+                        <button
+                            onClick={() => {
+                                setShowForgotPassword(false);
+                                setResetEmail("");
+                                setResetError("");
+                                setResetSuccess(false);
+                            }}
+                            className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+
+                        {!resetSuccess ? (
+                            <>
+                                <div className="text-center mb-6">
+                                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <Mail className="w-8 h-8 text-primary" />
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Forgot Password?</h2>
+                                    <p className="text-gray-500 text-sm">
+                                        Enter your email and we'll send you a link to reset your password.
+                                    </p>
+                                </div>
+
+                                {resetError && (
+                                    <div className="mb-4 p-4 bg-red-50 text-red-600 text-sm rounded-xl text-left font-semibold border border-red-100 flex items-center gap-2">
+                                        <span className="text-xl">⚠️</span> {resetError}
+                                    </div>
+                                )}
+
+                                <form onSubmit={handleForgotPassword} className="space-y-4">
+                                    <div className="text-left">
+                                        <label className="block font-bold text-sm mb-2 text-gray-700 ml-1">Email</label>
+                                        <input
+                                            type="email"
+                                            placeholder="hello@tingobingo.com"
+                                            className="w-full p-4 bg-gray-50/50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium placeholder:text-gray-400"
+                                            value={resetEmail}
+                                            onChange={(e) => setResetEmail(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={resetLoading}
+                                        className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-orange-600 active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-70"
+                                    >
+                                        {resetLoading ? (
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <>
+                                                Send Reset Link <ArrowRight className="w-5 h-5" />
+                                            </>
+                                        )}
+                                    </button>
+                                </form>
+                            </>
+                        ) : (
+                            <div className="text-center py-4">
+                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Mail className="w-8 h-8 text-green-600" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h2>
+                                <p className="text-gray-600 mb-6">
+                                    We've sent a password reset link to <strong>{resetEmail}</strong>
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        setShowForgotPassword(false);
+                                        setResetEmail("");
+                                        setResetSuccess(false);
+                                    }}
+                                    className="w-full bg-gray-900 text-white font-bold py-3 rounded-2xl hover:bg-black transition-all"
+                                >
+                                    Got it!
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
