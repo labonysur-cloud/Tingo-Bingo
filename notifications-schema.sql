@@ -101,9 +101,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trigger_post_like ON likes;
+DROP TRIGGER IF EXISTS trigger_post_like ON post_likes;
 CREATE TRIGGER trigger_post_like
-AFTER INSERT ON likes
+AFTER INSERT ON post_likes
 FOR EACH ROW
 EXECUTE FUNCTION notify_post_like();
 
