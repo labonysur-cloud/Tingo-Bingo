@@ -138,6 +138,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         };
     }, [user?.id]);
 
+
     // ============================================
     // FETCH POSTS (with like status)
     // ============================================
@@ -166,12 +167,15 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
             if (error) throw error;
 
-            const transformedPosts: Post[] = (data || []).map((post: any) => {
+            const transformedPosts: Post[] = await Promise.all((data || []).map(async (post: any) => {
                 // Check if current user has liked this post
                 const postLikes = post.post_likes || [];
                 const isLiked = user ? postLikes.some((like: any) => like.user_id === user.id) : false;
 
-                console.log(`📊 Post ${post.id.substring(0, 8)}: likes=${postLikes.length}, isLikedByMe=${isLiked}, currentUser=${user?.id.substring(0, 8)}`);
+                console.log(`📊 Post ${post.id.substring(0, 8)}: likes_count=${post.likes_count}, comments_count=${post.comments_count}, isLikedByMe=${isLiked}`);
+
+                // Fetch comments for this post
+                const comments = await getComments(post.id);
 
                 return {
                     id: post.id,
@@ -184,9 +188,10 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                     likesCount: post.likes_count || 0,
                     commentsCount: post.comments_count || 0,
                     isLikedByMe: isLiked,
-                    createdAt: post.created_at
+                    createdAt: post.created_at,
+                    comments: comments // Add comments to post
                 };
-            });
+            }));
 
             setPosts(transformedPosts);
         } catch (error) {
