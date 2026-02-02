@@ -11,7 +11,7 @@ import { Toaster } from "@/components/ui/Toaster";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "TingoBingo - The Pet Super App",
+  title: "TingoBingo",
   description: "Social network, shop, and utility for pet lovers",
   manifest: "/manifest.json",
   icons: {

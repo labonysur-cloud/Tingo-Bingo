@@ -73,11 +73,11 @@ export default function NotificationBell() {
             {/* Bell Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-all active:scale-95 relative"
+                className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors relative"
             >
-                <Bell className="w-5 h-5 text-white" />
+                <Bell className="w-5 h-5 text-gray-600" />
                 {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center shadow-md animate-pulse">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center">
                         {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                 )}

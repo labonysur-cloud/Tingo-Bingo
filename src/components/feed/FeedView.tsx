@@ -53,28 +53,28 @@ export default function FeedView() {
 
     return (
         <main className="pb-24 bg-gray-50 min-h-screen">
-            {/* Modern Header - Facebook Style */}
-            <header className="sticky top-0 bg-gradient-to-r from-orange-500 to-pink-500 z-10 px-4 py-4 shadow-lg">
+            {/* Simple Header */}
+            <header className="sticky top-0 bg-white border-b border-gray-200 z-10 px-4 py-3 shadow-sm">
                 <div className="flex justify-between items-center">
-                    {/* Logo - Big and Prominent */}
-                    <div className="flex items-center gap-3">
-                        <img src="/logo.png" alt="TingoBingo" className="w-12 h-12 rounded-2xl shadow-lg" />
-                        <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-md">TingoBingo</h1>
+                    {/* Logo */}
+                    <div className="flex items-center gap-2">
+                        <img src="/logo.png" alt="TingoBingo" className="w-10 h-10 rounded-xl" />
+                        <h1 className="text-xl font-bold text-gray-900">TingoBingo</h1>
                     </div>
 
                     {/* Right Actions */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={() => router.push('/search')}
-                            className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-all active:scale-95"
+                            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
                         >
-                            <Search className="w-5 h-5 text-white" />
+                            <Search className="w-5 h-5 text-gray-600" />
                         </button>
 
                         {/* Notification Bell */}
                         <NotificationBell />
 
-                        <Link href="/profile" className="w-10 h-10 rounded-full bg-white border-2 border-white/50 overflow-hidden shadow-lg block transition-transform active:scale-95">
+                        <Link href="/profile" className="w-10 h-10 rounded-full border border-gray-200 overflow-hidden block hover:opacity-80 transition-opacity">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest"} alt="Profile" className="w-full h-full object-cover" />
                         </Link>
