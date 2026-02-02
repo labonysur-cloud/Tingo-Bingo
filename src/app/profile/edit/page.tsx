@@ -193,7 +193,7 @@ export default function EditProfilePage() {
                 .from('users')
                 .upsert({
                     id: user.id,
-                    email: user.email,
+                    // Don't update email - it's already set and has UNIQUE constraint
                     name,
                     username: username || null,
                     bio,
