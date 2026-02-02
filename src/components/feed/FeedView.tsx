@@ -4,11 +4,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useSocial } from "@/context/SocialContext";
 import { useChat } from "@/context/ChatContext";
 // import { uploadToCloudinary } from "@/lib/cloudinary";  // No longer needed here
-import { Heart, MessageCircle, Share2, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search, Bell } from "lucide-react";
+import { Heart, MessageCircle, Share2, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search } from "lucide-react";
 import CreatePost from "./CreatePost";
 import AddStoryModal from "../stories/AddStoryModal";
 import StoryViewer from "../stories/StoryViewer";
 import LikeButton from "../ui/LikeButton";
+import NotificationBell from "../notifications/NotificationBell";
 import Link from "next/link";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -69,10 +70,10 @@ export default function FeedView() {
                         >
                             <Search className="w-5 h-5 text-white" />
                         </button>
-                        <button className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-all active:scale-95 relative">
-                            <Bell className="w-5 h-5 text-white" />
-                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center shadow-md">3</span>
-                        </button>
+
+                        {/* Notification Bell */}
+                        <NotificationBell />
+
                         <Link href="/profile" className="w-10 h-10 rounded-full bg-white border-2 border-white/50 overflow-hidden shadow-lg block transition-transform active:scale-95">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest"} alt="Profile" className="w-full h-full object-cover" />

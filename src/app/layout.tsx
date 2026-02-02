@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { SocialProvider } from "@/context/SocialContext";
 import { ChatProvider } from "@/context/ChatContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 import BottomNav from "@/components/layout/BottomNav";
 import { Toaster } from "@/components/ui/Toaster";
 
@@ -39,9 +40,11 @@ export default function RootLayout({
         <AuthProvider>
           <SocialProvider>
             <ChatProvider>
-              {children}
-              <BottomNav />
-              <Toaster />
+              <NotificationProvider>
+                {children}
+                <BottomNav />
+                <Toaster />
+              </NotificationProvider>
             </ChatProvider>
           </SocialProvider>
         </AuthProvider>
