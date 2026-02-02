@@ -130,7 +130,9 @@ export default function SettingsView() {
                     </button>
 
                     <div className="flex flex-col items-center gap-1 opacity-50">
-                        <div className="w-8 h-8 bg-gradient-to-tr from-secondary to-primary rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-sm mb-2">t</div>
+                        <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-pink-500 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg mb-2 transform rotate-3">
+                            TB
+                        </div>
                         <p className="text-xs text-gray-500 font-medium">TingoBingo v1.0.0</p>
                         <p className="text-xs text-gray-400 flex items-center gap-1">Made with <Heart className="w-3 h-3 text-red-400 fill-current" /> for Pets</p>
                     </div>

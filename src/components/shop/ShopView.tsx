@@ -162,8 +162,8 @@ export default function ShopView() {
                     <button
                         onClick={() => setViewMode("browse")}
                         className={`flex-1 py-2 px-4 rounded-xl font-bold text-sm transition-all ${viewMode === "browse"
-                                ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-md"
-                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-md"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                             }`}
                     >
                         Browse Products
@@ -171,8 +171,8 @@ export default function ShopView() {
                     <button
                         onClick={() => setViewMode("myListings")}
                         className={`flex-1 py-2 px-4 rounded-xl font-bold text-sm transition-all ${viewMode === "myListings"
-                                ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-md"
-                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-md"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                             }`}
                     >
                         My Listings
@@ -212,8 +212,8 @@ export default function ShopView() {
                                         key={cat.id}
                                         onClick={() => setActiveCategory(cat.id)}
                                         className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all whitespace-nowrap ${isActive
-                                                ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg scale-105"
-                                                : "bg-white text-gray-600 border-2 border-gray-200 hover:border-orange-300"
+                                            ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg scale-105"
+                                            : "bg-white text-gray-600 border-2 border-gray-200 hover:border-orange-300"
                                             }`}
                                     >
                                         <Icon className="w-4 h-4" />
@@ -275,8 +275,8 @@ export default function ShopView() {
                                             <button
                                                 onClick={() => addToCart(product.id)}
                                                 className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${cart.includes(product.id)
-                                                        ? "bg-gray-200 text-gray-600"
-                                                        : "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-md hover:shadow-lg active:scale-95"
+                                                    ? "bg-gray-200 text-gray-600"
+                                                    : "bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-md hover:shadow-lg active:scale-95"
                                                     }`}
                                             >
                                                 {cart.includes(product.id) ? "In Cart" : "Add"}
@@ -366,6 +366,32 @@ export default function ShopView() {
                     onSuccess={handleProductCreated}
                 />
             )}
+
+            {/* Coming Soon Overlay */}
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl p-10 max-w-md w-full text-center shadow-2xl">
+                    <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-orange-500 to-pink-500 rounded-3xl flex items-center justify-center transform rotate-3 shadow-lg">
+                        <ShoppingBag className="w-12 h-12 text-white" />
+                    </div>
+                    <h2 className="text-3xl font-black text-gray-900 mb-3">
+                        Coming Soon! 🚀
+                    </h2>
+                    <p className="text-gray-600 mb-6 text-lg">
+                        The Pet Marketplace is currently under development. Stay tuned for exciting products and deals!
+                    </p>
+                    <div className="bg-gradient-to-r from-orange-50 to-pink-50 rounded-2xl p-6">
+                        <p className="text-sm font-bold text-gray-700 mb-2">
+                            What's Coming:
+                        </p>
+                        <ul className="text-left text-sm text-gray-600 space-y-1">
+                            <li>✓ Pet Food & Treats</li>
+                            <li>✓ Toys & Accessories</li>
+                            <li>✓ Furniture & Beds</li>
+                            <li>✓ Health & Grooming</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
