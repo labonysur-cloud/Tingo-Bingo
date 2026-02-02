@@ -198,7 +198,7 @@ export default function EditProfilePage() {
                 avatar: photoURL
             });
 
-            const { data: updateData, error: updateError } = await supabase
+            const { data: updateData, error: updateError, count } = await supabase
                 .from('users')
                 .update({
                     name,
@@ -209,15 +209,38 @@ export default function EditProfilePage() {
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', user.id)
-                .select(); // Add select to see what was updated
+                .select();
 
             if (updateError) {
                 console.error('❌ Update error:', updateError);
+                alert(`Update failed: ${updateError.message}`);
                 throw updateError;
+            }
+
+            // Check if any rows were updated
+            if (!updateData || updateData.length === 0) {
+                console.error('❌ NO ROWS UPDATED! User might not exist in database.');
+                console.log('Trying to update user ID:', user.id);
+
+                // Check if user exists
+                const { data: existingUser } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('id', user.id)
+                    .single();
+
+                if (!existingUser) {
+                    alert('Your profile does not exist in the database. Please log out and log in again.');
+                    throw new Error('User not found in database');
+                }
+
+                alert('Failed to update profile - no rows affected. Check console for details.');
+                throw new Error('No rows updated');
             }
 
             console.log('✅ Profile saved to Supabase successfully!');
             console.log('Updated data:', updateData);
+            console.log('Rows updated:', updateData.length);
 
             // 3. Save Pet Data (Only if name is provided)
             if (petName.trim()) {
