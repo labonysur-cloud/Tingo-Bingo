@@ -294,8 +294,8 @@ export default function FeedView() {
                                                         onChange={(e) => setCommentText({ ...commentText, [post.id]: e.target.value })}
                                                         onKeyPress={(e) => {
                                                             if (e.key === 'Enter' && commentText[post.id]?.trim()) {
-                                                                const replyToId = commentText[`${post.id}_replyTo`];
-                                                                addComment(post.id, commentText[post.id], replyToId);
+                                                                const replyToId = commentText[`${post.id}_replyTo`] as string | undefined;
+                                                                addComment(post.id, commentText[post.id] ?? "", replyToId);
                                                                 setCommentText({
                                                                     ...commentText,
                                                                     [post.id]: "",
@@ -309,7 +309,7 @@ export default function FeedView() {
                                                         onClick={() => {
                                                             if (commentText[post.id]?.trim()) {
                                                                 const replyToId = commentText[`${post.id}_replyTo`];
-                                                                addComment(post.id, commentText[post.id], replyToId);
+                                                                addComment(post.id, commentText[post.id] ?? "", replyToId);
                                                                 setCommentText({
                                                                     ...commentText,
                                                                     [post.id]: "",
