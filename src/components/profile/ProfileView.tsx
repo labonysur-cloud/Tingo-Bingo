@@ -318,7 +318,7 @@ export default function ProfileView({ userId }: ProfileViewProps) {
                     </div>
                     <div className="w-px h-8 bg-gray-200"></div>
                     <div className="text-center group cursor-pointer hover:opacity-75 transition-opacity">
-                        <span className="block font-black text-xl text-gray-900 leading-none mb-1">{posts.length}</span>
+                        <span className="block font-black text-xl text-gray-900 leading-none mb-1">{allPosts.filter(p => p.userId === targetUserId).length}</span>
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Posts</span>
                     </div>
                 </div>
@@ -517,7 +517,9 @@ export default function ProfileView({ userId }: ProfileViewProps) {
                                 {/* Action Buttons */}
                                 <div className="flex items-center gap-6 mb-2">
                                     <LikeButton
-                                        postId={post.id}
+                                        isLiked={post.isLikedByMe || false}
+                                        likesCount={post.likesCount || 0}
+                                        onClick={() => likePost(post.id)}
                                         size="md"
                                     />
                                     <button
