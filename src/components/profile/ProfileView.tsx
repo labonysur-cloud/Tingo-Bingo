@@ -41,6 +41,7 @@ export default function ProfileView({ userId }: ProfileViewProps) {
     const [loadingPosts, setLoadingPosts] = useState(true);
     const [showComments, setShowComments] = useState<{ [key: string]: boolean }>({});
     const [commentText, setCommentText] = useState<{ [key: string]: string }>({});
+    const [refreshTrigger, setRefreshTrigger] = useState(0); // Add refresh trigger
 
     // Follow System State
     const [followersCount, setFollowersCount] = useState(0);
@@ -133,7 +134,20 @@ export default function ProfileView({ userId }: ProfileViewProps) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [targetUserId, currentUser, isMe]);
+    }, [targetUserId, currentUser, isMe, refreshTrigger]); // Added refreshTrigger
+
+    // Refresh data when page becomes visible (e.g., returning from edit page)
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && isMe) {
+                console.log('Page visible, refreshing profile data...');
+                setRefreshTrigger(prev => prev + 1);
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [isMe]);
 
     // Fetch User's Posts
     useEffect(() => {
