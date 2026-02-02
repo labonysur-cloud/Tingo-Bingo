@@ -10,6 +10,7 @@ import AddStoryModal from "../stories/AddStoryModal";
 import StoryViewer from "../stories/StoryViewer";
 import LikeButton from "../ui/LikeButton";
 import NotificationBell from "../notifications/NotificationBell";
+import CommentItem from "./CommentItem";
 import Link from "next/link";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -259,23 +260,20 @@ export default function FeedView() {
                                     <div className="border-t border-gray-100 bg-gray-50 animate-in slide-in-from-top-2 duration-300">
                                         {/* Existing Comments */}
                                         {post.comments && post.comments.length > 0 && (
-                                            <div className="px-4 py-3 max-h-64 overflow-y-auto space-y-3">
+                                            <div className="px-4 py-3 max-h-96 overflow-y-auto space-y-3">
                                                 {post.comments.map((comment) => (
-                                                    <div key={comment.id} className="flex gap-2">
-                                                        <Link href={`/profile/${comment.userId}`}>
-                                                            <img
-                                                                src={comment.userAvatar}
-                                                                alt={comment.userName}
-                                                                className="w-8 h-8 rounded-full object-cover flex-shrink-0 hover:opacity-80 transition-opacity"
-                                                            />
-                                                        </Link>
-                                                        <div className="flex-1 bg-white rounded-2xl px-3 py-2 shadow-sm">
-                                                            <Link href={`/profile/${comment.userId}`}>
-                                                                <p className="font-bold text-sm text-gray-900 hover:underline">{comment.userName}</p>
-                                                            </Link>
-                                                            <p className="text-gray-700 text-sm">{comment.text}</p>
-                                                        </div>
-                                                    </div>
+                                                    <CommentItem
+                                                        key={comment.id}
+                                                        comment={comment}
+                                                        onReply={(commentId, parentName) => {
+                                                            // Set comment text with @mention
+                                                            setCommentText({
+                                                                ...commentText,
+                                                                [post.id]: `@${parentName} `,
+                                                                [`${post.id}_replyTo`]: commentId
+                                                            });
+                                                        }}
+                                                    />
                                                 ))}
                                             </div>
                                         )}
@@ -296,8 +294,13 @@ export default function FeedView() {
                                                         onChange={(e) => setCommentText({ ...commentText, [post.id]: e.target.value })}
                                                         onKeyPress={(e) => {
                                                             if (e.key === 'Enter' && commentText[post.id]?.trim()) {
-                                                                addComment(post.id, commentText[post.id]);
-                                                                setCommentText({ ...commentText, [post.id]: "" });
+                                                                const replyToId = commentText[`${post.id}_replyTo`];
+                                                                addComment(post.id, commentText[post.id], replyToId);
+                                                                setCommentText({
+                                                                    ...commentText,
+                                                                    [post.id]: "",
+                                                                    [`${post.id}_replyTo`]: undefined
+                                                                });
                                                             }
                                                         }}
                                                         className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
@@ -305,8 +308,13 @@ export default function FeedView() {
                                                     <button
                                                         onClick={() => {
                                                             if (commentText[post.id]?.trim()) {
-                                                                addComment(post.id, commentText[post.id]);
-                                                                setCommentText({ ...commentText, [post.id]: "" });
+                                                                const replyToId = commentText[`${post.id}_replyTo`];
+                                                                addComment(post.id, commentText[post.id], replyToId);
+                                                                setCommentText({
+                                                                    ...commentText,
+                                                                    [post.id]: "",
+                                                                    [`${post.id}_replyTo`]: undefined
+                                                                });
                                                             }
                                                         }}
                                                         disabled={!commentText[post.id]?.trim()}
