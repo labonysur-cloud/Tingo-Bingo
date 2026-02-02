@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import FollowListModal from "./FollowListModal";
 import CommentItem from "../feed/CommentItem";
-import LikeButton from "../feed/LikeButton";
+import LikeButton from "../ui/LikeButton";
 
 interface Post {
     id: string;
