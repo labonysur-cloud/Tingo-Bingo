@@ -124,6 +124,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
 
         const fetchMessages = async () => {
+            console.log('📥 Fetching messages for chat:', activeConversationId);
             const { data, error } = await supabase
                 .from('messages')
                 .select('*')
@@ -131,8 +132,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 .order('created_at', { ascending: true });
 
             if (error) {
-                console.error("Error fetching messages:", error);
+                console.error("❌ Error fetching messages:", error);
             } else {
+                console.log('✅ Fetched messages:', data?.length);
                 setMessages(data || []);
             }
         };
@@ -177,7 +179,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             console.log('🔕 Removing subscription for chat:', activeConversationId);
             supabase.removeChannel(channel);
         };
-    }, [activeConversationId]);
+    }, [activeConversationId, refreshMessages]); // Refetch when refreshMessages changes
 
     // Initial load
     useEffect(() => {
@@ -241,6 +243,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             } else {
                 console.log('✅ Chat timestamp updated');
             }
+
+            // Manually refetch messages to show the new one immediately
+            console.log('🔄 Triggering message refresh...');
+            setRefreshMessages(prev => prev + 1);
 
         } catch (error) {
             console.error("❌ Error sending message:", error);
