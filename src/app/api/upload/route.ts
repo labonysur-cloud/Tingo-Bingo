@@ -53,33 +53,48 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'File too large. Max size is 10MB.' }, { status: 400 });
         }
 
-        // Convert file to base64 for Cloudinary upload
+        // Convert file to buffer for Cloudinary upload
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
-        const base64 = buffer.toString('base64');
-        const dataURI = `data:${file.type};base64,${base64}`;
 
-        // Upload to Cloudinary with auto-optimization
-        const result = await cloudinary.uploader.upload(dataURI, {
-            folder: 'tingobingo/uploads',
-            // Auto-optimization transformations
-            transformation: [
-                { width: 1080, crop: 'limit' }, // Max width 1080px
-                { quality: 'auto:good' }, // Auto quality
-                { fetch_format: 'auto' }, // Auto format (WebP for supported browsers)
-            ],
-            // Additional security
-            invalidate: true, // Invalidate CDN cache
+        console.log(`📤 Uploading to Cloudinary...`);
+
+        // Upload to Cloudinary using upload_stream (more reliable than data URI)
+        const result = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    folder: 'tingobingo/uploads',
+                    // Auto-optimization transformations
+                    transformation: [
+                        { width: 1080, crop: 'limit' }, // Max width 1080px
+                        { quality: 'auto:good' }, // Auto quality
+                        { fetch_format: 'auto' }, // Auto format (WebP for supported browsers)
+                    ],
+                    // Additional security
+                    invalidate: true, // Invalidate CDN cache
+                    resource_type: 'auto', // Auto-detect resource type
+                },
+                (error, result) => {
+                    if (error) {
+                        console.error('❌ Cloudinary upload error:', error);
+                        reject(error);
+                    } else {
+                        console.log('✅ Image uploaded successfully:', result?.public_id);
+                        resolve(result);
+                    }
+                }
+            );
+
+            // Write buffer to stream
+            uploadStream.end(buffer);
         });
 
-        console.log('✅ Image uploaded successfully:', result.public_id);
-
         return NextResponse.json({
-            url: result.secure_url,
-            publicId: result.public_id,
-            width: result.width,
-            height: result.height,
-            format: result.format,
+            url: (result as any).secure_url,
+            publicId: (result as any).public_id,
+            width: (result as any).width,
+            height: (result as any).height,
+            format: (result as any).format,
         });
     } catch (error: any) {
         console.error('❌ Upload error:', error);
