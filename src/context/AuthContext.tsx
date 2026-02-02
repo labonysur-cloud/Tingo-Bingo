@@ -85,12 +85,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // Ensure Supabase profile exists
                 await ensureSupabaseProfile(currentUser);
 
-                setUser({
-                    id: currentUser.uid,
-                    name: currentUser.displayName || "Pet Lover",
-                    email: currentUser.email || "",
-                    avatar: currentUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.uid}`,
-                });
+                // Fetch user data from Supabase (not Firebase) so we get latest name, username, bio, etc.
+                try {
+                    const { data: userData, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('id', currentUser.uid)
+                        .single();
+
+                    if (error) throw error;
+
+                    setUser({
+                        id: currentUser.uid,
+                        name: userData.name || currentUser.displayName || "Pet Lover",
+                        email: currentUser.email || "",
+                        avatar: userData.avatar || currentUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.uid}`,
+                        username: userData.username
+                    });
+                } catch (error) {
+                    console.error('Error fetching user from Supabase:', error);
+                    // Fallback to Firebase data if Supabase fetch fails
+                    setUser({
+                        id: currentUser.uid,
+                        name: currentUser.displayName || "Pet Lover",
+                        email: currentUser.email || "",
+                        avatar: currentUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.uid}`,
+                    });
+                }
             } else {
                 setUser(null);
             }
