@@ -36,10 +36,10 @@ export default function ProfileView({ userId }: ProfileViewProps) {
     const isMe = currentUser?.id === targetUserId;
 
 
+
     const [profileData, setProfileData] = useState<any>(null);
     const [primaryPet, setPrimaryPet] = useState<any>(null);
     const [allPets, setAllPets] = useState<any[]>([]); // Store all pets
-    const [posts, setPosts] = useState<Post[]>([]);
     const [loadingPosts, setLoadingPosts] = useState(true);
     const [showComments, setShowComments] = useState<{ [key: string]: boolean }>({});
     const [commentText, setCommentText] = useState<{ [key: string]: string | undefined }>({});
@@ -151,36 +151,13 @@ export default function ProfileView({ userId }: ProfileViewProps) {
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [isMe]);
 
-    // Fetch User's Posts
+    // Set loading to false once allPosts are available
     useEffect(() => {
-        if (!targetUserId) return;
-
-        const fetchPosts = async () => {
-            setLoadingPosts(true);
-            const { data } = await supabase
-                .from('posts')
-                .select('*')
-                .eq('user_id', targetUserId)
-                .order('created_at', { ascending: false });
-
-            setPosts(data || []);
+        if (allPosts.length >= 0) {
             setLoadingPosts(false);
-        };
+        }
+    }, [allPosts]);
 
-        fetchPosts();
-
-        // Subscribe to new posts
-        const channel = supabase
-            .channel(`profile-posts-${targetUserId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'posts', filter: `user_id=eq.${targetUserId}` },
-                () => fetchPosts()
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [targetUserId]);
 
     const handleFollow = async () => {
         if (!currentUser || !targetUserId || followLoading) return;
@@ -517,7 +494,7 @@ export default function ProfileView({ userId }: ProfileViewProps) {
 
                 {loadingPosts ? (
                     <div className="p-12 text-center text-gray-400">Loading posts...</div>
-                ) : posts.length === 0 ? (
+                ) : allPosts.filter(p => p.userId === targetUserId).length === 0 ? (
                     <div className="text-center text-gray-400 py-12 bg-white rounded-3xl border border-gray-100">
                         No posts yet.
                     </div>
