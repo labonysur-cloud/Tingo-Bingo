@@ -173,12 +173,23 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     // 3. Send Message
     const sendMessage = async (content: string, file?: File | null, mediaType?: 'image' | 'video' | 'gif') => {
-        if (!user || !activeConversationId) return;
+        console.log('📤 sendMessage called');
+        console.log('User:', user?.id);
+        console.log('Active chat:', activeConversationId);
+        console.log('Content:', content);
+        console.log('File:', file);
+
+        if (!user || !activeConversationId) {
+            console.error('❌ Cannot send - missing user or chat ID');
+            return;
+        }
 
         try {
             let mediaUrl = null;
             if (file) {
+                console.log('📸 Uploading media...');
                 mediaUrl = await uploadToCloudinary(file);
+                console.log('✅ Media uploaded:', mediaUrl);
             }
 
             const newMessage = {
@@ -189,22 +200,38 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 media_type: mediaType || (file ? 'image' : null)
             };
 
-            // Optimistic update (optional, but Realtime is fast enough generally)
+            console.log('💾 Inserting message:', newMessage);
 
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('messages')
-                .insert(newMessage);
+                .insert(newMessage)
+                .select();
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Insert error:', error);
+                throw error;
+            }
+
+            console.log('✅ Message inserted successfully:', data);
 
             // Update chat timestamp
-            await supabase
+            const { error: updateError } = await supabase
                 .from('chats')
-                .update({ updated_at: new Date().toISOString() })
+                .update({
+                    updated_at: new Date().toISOString(),
+                    last_message: content || 'Media'
+                })
                 .eq('id', activeConversationId);
 
+            if (updateError) {
+                console.error('⚠️ Chat update error:', updateError);
+            } else {
+                console.log('✅ Chat timestamp updated');
+            }
+
         } catch (error) {
-            console.error("Error sending message:", error);
+            console.error("❌ Error sending message:", error);
+            alert(`Failed to send message: ${error}`);
             throw error;
         }
     };
