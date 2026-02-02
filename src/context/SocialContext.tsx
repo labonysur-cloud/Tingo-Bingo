@@ -701,15 +701,14 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
             showToast.success(parentCommentId ? 'Reply added!' : 'Comment added!');
 
-            // Update comments count optimistically (only for top-level comments)
-            if (!parentCommentId) {
-                setPosts(prev => prev.map(p => {
-                    if (p.id === postId) {
-                        return { ...p, commentsCount: p.commentsCount + 1 };
-                    }
-                    return p;
-                }));
-            }
+            // Update comments count optimistically (for BOTH top-level and replies)
+            // Since we now count ALL comments, increment regardless of parent
+            setPosts(prev => prev.map(p => {
+                if (p.id === postId) {
+                    return { ...p, commentsCount: p.commentsCount + 1 };
+                }
+                return p;
+            }));
         } catch (error: any) {
             console.error("❌ Error adding comment:", error);
             showToast.error('Failed to add comment');
