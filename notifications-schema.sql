@@ -14,14 +14,14 @@ CREATE TABLE IF NOT EXISTS notifications (
     actor_name TEXT,
     actor_avatar TEXT,
     reference_id TEXT,
-    is_read BOOLEAN DEFAULT FALSE,
+    read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 2. Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read) WHERE is_read = FALSE;
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read) WHERE read = FALSE;
 
 -- 3. Enable Row Level Security
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;

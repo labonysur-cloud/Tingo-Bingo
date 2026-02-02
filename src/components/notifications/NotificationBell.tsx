@@ -46,7 +46,7 @@ export default function NotificationBell() {
 
     const handleNotificationClick = async (notification: any) => {
         // Mark as read
-        if (!notification.isRead) {
+        if (!notification.read) {
             await markAsRead(notification.id);
         }
 
@@ -111,11 +111,11 @@ export default function NotificationBell() {
                                 <div
                                     key={notification.id}
                                     onClick={() => handleNotificationClick(notification)}
-                                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3 ${!notification.isRead ? 'bg-blue-50/50' : ''
+                                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3 ${!notification.read ? 'bg-blue-50/50' : ''
                                         }`}
                                 >
                                     {/* Unread Indicator */}
-                                    {!notification.isRead && (
+                                    {!notification.read && (
                                         <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
                                     )}
 
@@ -130,7 +130,7 @@ export default function NotificationBell() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start gap-2">
                                             <div className="flex-1">
-                                                <p className={`text-sm ${!notification.isRead ? 'font-bold text-gray-900' : 'text-gray-700'
+                                                <p className={`text-sm ${!notification.read ? 'font-bold text-gray-900' : 'text-gray-700'
                                                     }`}>
                                                     {notification.message}
                                                 </p>

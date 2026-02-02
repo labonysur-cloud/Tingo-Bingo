@@ -14,7 +14,7 @@ export interface Notification {
     actorName: string;
     actorAvatar: string;
     referenceId?: string;
-    isRead: boolean;
+    read: boolean;
     createdAt: string;
 }
 
@@ -63,7 +63,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                 actorName: n.actor_name,
                 actorAvatar: n.actor_avatar,
                 referenceId: n.reference_id,
-                isRead: n.is_read,
+                read: n.read,
                 createdAt: n.created_at
             }));
 
@@ -102,7 +102,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                         actorName: payload.new.actor_name,
                         actorAvatar: payload.new.actor_avatar,
                         referenceId: payload.new.reference_id,
-                        isRead: payload.new.is_read,
+                        read: payload.new.read,
                         createdAt: payload.new.created_at
                     };
 
@@ -121,13 +121,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         try {
             const { error } = await supabase
                 .from('notifications')
-                .update({ is_read: true })
+                .update({ read: true })
                 .eq('id', id);
 
             if (error) throw error;
 
             setNotifications(prev =>
-                prev.map(n => n.id === id ? { ...n, isRead: true } : n)
+                prev.map(n => n.id === id ? { ...n, read: true } : n)
             );
         } catch (error) {
             console.error('Error marking notification as read:', error);
@@ -141,14 +141,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         try {
             const { error } = await supabase
                 .from('notifications')
-                .update({ is_read: true })
+                .update({ read: true })
                 .eq('user_id', user.id)
-                .eq('is_read', false);
+                .eq('read', false);
 
             if (error) throw error;
 
             setNotifications(prev =>
-                prev.map(n => ({ ...n, isRead: true }))
+                prev.map(n => ({ ...n, read: true }))
             );
         } catch (error) {
             console.error('Error marking all as read:', error);
@@ -171,7 +171,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const unreadCount = notifications.filter(n => !n.isRead).length;
+    const unreadCount = notifications.filter(n => !n.read).length;
 
     return (
         <NotificationContext.Provider
