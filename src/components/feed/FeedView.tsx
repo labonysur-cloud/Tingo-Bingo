@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 
 export default function FeedView() {
     const { user } = useAuth();
-    const { posts, addPost, likePost, addComment, stories } = useSocial();
+    const { posts, addPost, likePost, addComment, likeComment, stories } = useSocial();
     const { startConversation } = useChat();
     const router = useRouter();
 
@@ -265,6 +265,7 @@ export default function FeedView() {
                                                     <CommentItem
                                                         key={comment.id}
                                                         comment={comment}
+                                                        postId={post.id}
                                                         onReply={(commentId, parentName) => {
                                                             // Set comment text with @mention
                                                             setCommentText({
@@ -272,6 +273,9 @@ export default function FeedView() {
                                                                 [post.id]: `@${parentName} `,
                                                                 [`${post.id}_replyTo`]: commentId
                                                             });
+                                                        }}
+                                                        onLike={(commentId, postId) => {
+                                                            likeComment(commentId, postId);
                                                         }}
                                                     />
                                                 ))}

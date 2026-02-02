@@ -17,6 +17,8 @@ export interface Comment {
     createdAt: string;
     parent_comment_id?: string | null; // For nested replies
     replies?: Comment[]; // Nested replies
+    likes_count?: number; // Comment likes
+    isLikedByMe?: boolean; // Current user liked this comment
 }
 
 export interface Post {
@@ -125,6 +127,18 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                 (payload) => {
                     console.log('💬 Comment change:', payload);
                     fetchPosts(); // Refresh to get updated comment counts
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'comment_likes'
+                },
+                (payload) => {
+                    console.log('❤️ Comment like change:', payload);
+                    fetchPosts(); // Refresh to get updated comment like counts
                 }
             )
             .subscribe();
@@ -605,9 +619,13 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                     content,
                     created_at,
                     parent_comment_id,
+                    likes_count,
                     users:user_id (
                         name,
                         avatar
+                    ),
+                    comment_likes!left (
+                        user_id
                     )
                 `)
                 .eq('post_id', postId)
@@ -618,17 +636,25 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             console.log(`💬 Fetched ${data?.length || 0} total comments for post ${postId.substring(0, 8)}`);
 
             // Transform and organize comments with replies
-            const allComments: Comment[] = (data || []).map((comment: any) => ({
-                id: comment.id,
-                postId: comment.post_id,
-                userId: comment.user_id,
-                userName: comment.users?.name || "Unknown User",
-                userAvatar: comment.users?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`,
-                text: comment.content,
-                createdAt: comment.created_at,
-                parent_comment_id: comment.parent_comment_id,
-                replies: []
-            }));
+            const allComments: Comment[] = (data || []).map((comment: any) => {
+                // Check if current user has liked this comment
+                const comment_likes = comment.comment_likes || [];
+                const isLiked = user ? comment_likes.some((like: any) => like.user_id === user.id) : false;
+
+                return {
+                    id: comment.id,
+                    postId: comment.post_id,
+                    userId: comment.user_id,
+                    userName: comment.users?.name || "Unknown User",
+                    userAvatar: comment.users?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`,
+                    text: comment.content,
+                    createdAt: comment.created_at,
+                    parent_comment_id: comment.parent_comment_id,
+                    likes_count: comment.likes_count || 0,
+                    isLikedByMe: isLiked,
+                    replies: []
+                };
+            });
 
             // Organize comments into parent-child structure
             const topLevelComments: Comment[] = [];
@@ -717,6 +743,104 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     };
 
     // ============================================
+    // LIKE/UNLIKE COMMENT
+    // ============================================
+    const likeComment = async (commentId: string, postId: string) => {
+        if (!user) {
+            showToast.error('Please log in to like comments');
+            return;
+        }
+
+        try {
+            console.log(`❤️ Toggling like for comment ${commentId}`);
+
+            // Find the comment in current posts to check like status
+            const post = posts.find(p => p.id === postId);
+            if (!post || !post.comments) return;
+
+            // Find the comment (could be nested)
+            const findComment = (comments: Comment[]): Comment | null => {
+                for (const c of comments) {
+                    if (c.id === commentId) return c;
+                    if (c.replies) {
+                        const found = findComment(c.replies);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            };
+
+            const comment = findComment(post.comments);
+            if (!comment) return;
+
+            const authSupabase = await getAuthenticatedSupabase();
+
+            if (comment.isLikedByMe) {
+                // Unlike
+                const { error } = await authSupabase
+                    .from('comment_likes')
+                    .delete()
+                    .eq('comment_id', commentId)
+                    .eq('user_id', user.id);
+
+                if (error) throw error;
+                console.log('👎 Comment unliked');
+            } else {
+                // Like
+                const { error } = await authSupabase
+                    .from('comment_likes')
+                    .insert({
+                        comment_id: commentId,
+                        user_id: user.id
+                    });
+
+                if (error) throw error;
+                console.log('👍 Comment liked');
+            }
+
+            // Optimistic update: Update the comment's like status
+            const updateCommentLikes = (comments: Comment[]): Comment[] => {
+                return comments.map(c => {
+                    if (c.id === commentId) {
+                        const newIsLiked = !c.isLikedByMe;
+                        const newLikesCount = newIsLiked
+                            ? (c.likes_count || 0) + 1
+                            : Math.max(0, (c.likes_count || 0) - 1);
+
+                        return {
+                            ...c,
+                            isLikedByMe: newIsLiked,
+                            likes_count: newLikesCount
+                        };
+                    }
+                    if (c.replies) {
+                        return {
+                            ...c,
+                            replies: updateCommentLikes(c.replies)
+                        };
+                    }
+                    return c;
+                });
+            };
+
+            setPosts(prev => prev.map(p => {
+                if (p.id === postId && p.comments) {
+                    return {
+                        ...p,
+                        comments: updateCommentLikes(p.comments)
+                    };
+                }
+                return p;
+            }));
+
+        } catch (error: any) {
+            console.error("❌ Error liking comment:", error);
+            showToast.error('Failed to like comment');
+        }
+    };
+
+
+    // ============================================
     // DELETE POST
     // ============================================
     const deletePost = async (postId: string) => {
@@ -780,6 +904,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             likePost,
             getComments,
             addComment,
+            likeComment,
             deletePost,
             deleteComment,
             stories,
