@@ -1,38 +1,37 @@
 -- ============================================
--- TINGOBINGO - COMPLETE DATABASE RESET AND SETUP
--- Run this entire script to fix all database issues
+-- TINGOBINGO - FINAL COMPLETE DATABASE SETUP
+-- This matches your current app code structure
 -- ============================================
 
--- ============================================
--- STEP 1: DROP EVERYTHING (CLEAN SLATE)
--- ============================================
-
--- Drop all tables
+-- DROP EVERYTHING
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS follows CASCADE;
 DROP TABLE IF EXISTS comments CASCADE;
 DROP TABLE IF EXISTS post_likes CASCADE;
-DROP TABLE IF EXISTS profile_name_changes CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS chats CASCADE;
+DROP TABLE IF EXISTS conversations CASCADE;
+DROP TABLE IF EXISTS conversation_participants CASCADE;
+DROP TABLE IF EXISTS highlight_stories CASCADE;
+DROP TABLE IF EXISTS highlights CASCADE;
+DROP TABLE IF EXISTS stories CASCADE;
 DROP TABLE IF EXISTS posts CASCADE;
 DROP TABLE IF EXISTS pets CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
--- Drop all functions
+-- Drop functions
 DROP FUNCTION IF EXISTS notify_new_follower CASCADE;
 DROP FUNCTION IF EXISTS notify_post_like CASCADE;
 DROP FUNCTION IF EXISTS notify_post_comment CASCADE;
 DROP FUNCTION IF EXISTS notify_new_message CASCADE;
-DROP FUNCTION IF EXISTS set_primary_pet CASCADE;
-DROP FUNCTION IF EXISTS can_change_profile_name CASCADE;
 DROP FUNCTION IF EXISTS update_updated_at_column CASCADE;
+DROP FUNCTION IF EXISTS get_or_create_conversation CASCADE;
 
 -- ============================================
--- STEP 2: CREATE CORE TABLES
+-- CREATE TABLES
 -- ============================================
 
--- Users Table
+-- Users
 CREATE TABLE users (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
@@ -41,14 +40,12 @@ CREATE TABLE users (
   avatar TEXT,
   bio TEXT,
   location TEXT,
-  profile_name_changes INTEGER DEFAULT 0,
-  profile_name_last_changed TIMESTAMPTZ,
   primary_pet_id UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Pets Table
+-- Pets
 CREATE TABLE pets (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -66,15 +63,11 @@ CREATE TABLE pets (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE users ADD CONSTRAINT fk_users_primary_pet 
-  FOREIGN KEY (primary_pet_id) REFERENCES pets(id) ON DELETE SET NULL;
-
--- Posts Table
+-- Posts
 CREATE TABLE posts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   pet_id UUID REFERENCES pets(id) ON DELETE SET NULL,
-  posted_as_pet_id UUID REFERENCES pets(id) ON DELETE SET NULL,
   content TEXT,
   image_url TEXT,
   likes_count INTEGER DEFAULT 0,
@@ -82,7 +75,7 @@ CREATE TABLE posts (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Post Likes Table
+-- Post Likes
 CREATE TABLE post_likes (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
@@ -91,7 +84,7 @@ CREATE TABLE post_likes (
     UNIQUE(post_id, user_id)
 );
 
--- Comments Table
+-- Comments
 CREATE TABLE comments (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
@@ -100,7 +93,7 @@ CREATE TABLE comments (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Follows Table
+-- Follows
 CREATE TABLE follows (
     follower_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     following_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -108,7 +101,7 @@ CREATE TABLE follows (
     PRIMARY KEY (follower_id, following_id)
 );
 
--- Chats Table
+-- Chats (Simple Schema)
 CREATE TABLE chats (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   participant_1 TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -119,7 +112,7 @@ CREATE TABLE chats (
   UNIQUE(participant_1, participant_2)
 );
 
--- Messages Table
+-- Messages
 CREATE TABLE messages (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
@@ -128,7 +121,36 @@ CREATE TABLE messages (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Notifications Table
+-- Stories
+CREATE TABLE stories (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    media_url TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('image', 'video')),
+    caption TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 hours')
+);
+
+-- Highlights
+CREATE TABLE highlights (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    cover_image TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Highlight Stories (Junction Table)
+CREATE TABLE highlight_stories (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    highlight_id UUID NOT NULL REFERENCES highlights(id) ON DELETE CASCADE,
+    story_id UUID NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+    added_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(highlight_id, story_id)
+);
+
+-- Notifications
 CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -143,52 +165,30 @@ CREATE TABLE notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Profile Name Changes History
-CREATE TABLE profile_name_changes (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pet_id UUID REFERENCES pets(id) ON DELETE SET NULL,
-  old_name TEXT,
-  new_name TEXT NOT NULL,
-  changed_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- ============================================
--- STEP 3: CREATE INDEXES
+-- CREATE INDEXES
 -- ============================================
 
--- Users
 CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_name ON users(name);
-CREATE INDEX idx_users_primary_pet ON users(primary_pet_id);
-
--- Pets
 CREATE INDEX idx_pets_owner ON pets(owner_id);
-CREATE INDEX idx_pets_primary ON pets(is_primary) WHERE is_primary = true;
-
--- Posts
 CREATE INDEX idx_posts_user ON posts(user_id);
 CREATE INDEX idx_posts_created ON posts(created_at DESC);
-
--- Post Likes
 CREATE INDEX idx_post_likes_post ON post_likes(post_id);
 CREATE INDEX idx_post_likes_user ON post_likes(user_id);
-
--- Comments
 CREATE INDEX idx_comments_post ON comments(post_id);
-CREATE INDEX idx_comments_user ON comments(user_id);
-
--- Follows
 CREATE INDEX idx_follows_follower ON follows(follower_id);
 CREATE INDEX idx_follows_following ON follows(following_id);
-
--- Notifications
+CREATE INDEX idx_chats_participants ON chats(participant_1, participant_2);
+CREATE INDEX idx_messages_chat ON messages(chat_id);
+CREATE INDEX idx_stories_user ON stories(user_id);
+CREATE INDEX idx_stories_expires ON stories(expires_at);
+CREATE INDEX idx_highlights_user ON highlights(user_id);
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
 CREATE INDEX idx_notifications_unread ON notifications(user_id, read) WHERE read = FALSE;
 
 -- ============================================
--- STEP 4: ENABLE ROW LEVEL SECURITY
+-- ENABLE RLS
 -- ============================================
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -199,61 +199,48 @@ ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE follows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE highlights ENABLE ROW LEVEL SECURITY;
+ALTER TABLE highlight_stories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE profile_name_changes ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
--- STEP 5: CREATE RLS POLICIES
+-- RLS POLICIES
 -- ============================================
 
--- Users Policies
-CREATE POLICY "Anyone can view user profiles" ON users FOR SELECT USING (true);
+-- Users
+CREATE POLICY "Anyone can view users" ON users FOR SELECT USING (true);
 CREATE POLICY "Users can insert own profile" ON users FOR INSERT WITH CHECK (true);
-CREATE POLICY "Users can update own profile" ON users FOR UPDATE 
-  USING (id = current_setting('request.jwt.claims', true)::json->>'sub');
-CREATE POLICY "Users can delete own profile" ON users FOR DELETE 
-  USING (id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (id = current_setting('request.jwt.claims', true)::json->>'sub');
 
--- Pets Policies
+-- Pets
 CREATE POLICY "Anyone can view pets" ON pets FOR SELECT USING (true);
-CREATE POLICY "Users can create own pets" ON pets FOR INSERT 
-  WITH CHECK (owner_id = current_setting('request.jwt.claims', true)::json->>'sub');
-CREATE POLICY "Users can update own pets" ON pets FOR UPDATE 
-  USING (owner_id = current_setting('request.jwt.claims', true)::json->>'sub');
-CREATE POLICY "Users can delete own pets" ON pets FOR DELETE 
-  USING (owner_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can create own pets" ON pets FOR INSERT WITH CHECK (owner_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can update own pets" ON pets FOR UPDATE USING (owner_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can delete own pets" ON pets FOR DELETE USING (owner_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
--- Posts Policies
+-- Posts
 CREATE POLICY "Anyone can view posts" ON posts FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can create posts" ON posts FOR INSERT 
-  WITH CHECK (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
-CREATE POLICY "Users can update own posts" ON posts FOR UPDATE 
-  USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
-CREATE POLICY "Users can delete own posts" ON posts FOR DELETE 
-  USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Authenticated users can create posts" ON posts FOR INSERT WITH CHECK (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can update own posts" ON posts FOR UPDATE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can delete own posts" ON posts FOR DELETE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
--- Post Likes Policies
+-- Post Likes
 CREATE POLICY "Anyone can view likes" ON post_likes FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can like" ON post_likes FOR INSERT 
-  WITH CHECK (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
-CREATE POLICY "Users can unlike" ON post_likes FOR DELETE 
-  USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Authenticated users can like" ON post_likes FOR INSERT WITH CHECK (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can unlike" ON post_likes FOR DELETE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
--- Comments Policies
+-- Comments
 CREATE POLICY "Anyone can view comments" ON comments FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can comment" ON comments FOR INSERT 
-  WITH CHECK (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
-CREATE POLICY "Users can delete own comments" ON comments FOR DELETE 
-  USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Authenticated users can comment" ON comments FOR INSERT WITH CHECK (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can delete own comments" ON comments FOR DELETE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
--- Follows Policies
+-- Follows
 CREATE POLICY "Anyone can view follows" ON follows FOR SELECT USING (true);
-CREATE POLICY "Users can follow" ON follows FOR INSERT 
-  WITH CHECK (follower_id = current_setting('request.jwt.claims', true)::json->>'sub');
-CREATE POLICY "Users can unfollow" ON follows FOR DELETE 
-  USING (follower_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can follow" ON follows FOR INSERT WITH CHECK (follower_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can unfollow" ON follows FOR DELETE USING (follower_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
--- Chats Policies
+-- Chats
 CREATE POLICY "Users can view own chats" ON chats FOR SELECT USING (
     participant_1 = current_setting('request.jwt.claims', true)::json->>'sub' OR
     participant_2 = current_setting('request.jwt.claims', true)::json->>'sub'
@@ -267,7 +254,7 @@ CREATE POLICY "Users can update own chats" ON chats FOR UPDATE USING (
     participant_2 = current_setting('request.jwt.claims', true)::json->>'sub'
 );
 
--- Messages Policies
+-- Messages
 CREATE POLICY "Users can view messages in own chats" ON messages FOR SELECT USING (
     EXISTS (
         SELECT 1 FROM chats WHERE chats.id = messages.chat_id AND (
@@ -286,19 +273,31 @@ CREATE POLICY "Users can send messages" ON messages FOR INSERT WITH CHECK (
     )
 );
 
--- Notifications Policies
-CREATE POLICY "Users can view own notifications" ON notifications FOR SELECT
-  USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
-CREATE POLICY "Users can update own notifications" ON notifications FOR UPDATE
-  USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
-CREATE POLICY "Users can delete own notifications" ON notifications FOR DELETE
-  USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+-- Stories
+CREATE POLICY "Anyone can view active stories" ON stories FOR SELECT USING (expires_at > NOW());
+CREATE POLICY "Users can create own stories" ON stories FOR INSERT WITH CHECK (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can delete own stories" ON stories FOR DELETE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+
+-- Highlights
+CREATE POLICY "Anyone can view highlights" ON highlights FOR SELECT USING (true);
+CREATE POLICY "Users can create own highlights" ON highlights FOR INSERT WITH CHECK (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can update own highlights" ON highlights FOR UPDATE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can delete own highlights" ON highlights FOR DELETE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+
+-- Highlight Stories (permissive for now)
+CREATE POLICY "Anyone can view highlight stories" ON highlight_stories FOR SELECT USING (true);
+CREATE POLICY "Users can add to highlights" ON highlight_stories FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can remove from highlights" ON highlight_stories FOR DELETE USING (true);
+
+-- Notifications
+CREATE POLICY "Users can view own notifications" ON notifications FOR SELECT USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can update own notifications" ON notifications FOR UPDATE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
+CREATE POLICY "Users can delete own notifications" ON notifications FOR DELETE USING (user_id = current_setting('request.jwt.claims', true)::json->>'sub');
 
 -- ============================================
--- STEP 6: CREATE HELPER FUNCTIONS
+-- FUNCTIONS
 -- ============================================
 
--- Update timestamp function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -308,10 +307,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================
--- STEP 7: CREATE TRIGGERS
+-- TRIGGERS
 -- ============================================
 
--- Auto-update timestamps
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -322,10 +320,9 @@ CREATE TRIGGER update_chats_updated_at BEFORE UPDATE ON chats
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================
--- STEP 8: NOTIFICATION TRIGGERS
+-- NOTIFICATION TRIGGERS
 -- ============================================
 
--- Trigger 1: New Follower Notification
 CREATE OR REPLACE FUNCTION notify_new_follower()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -340,7 +337,6 @@ BEGIN
         follower.avatar
     FROM users follower
     WHERE follower.id = NEW.follower_id;
-    
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -350,14 +346,12 @@ AFTER INSERT ON follows
 FOR EACH ROW
 EXECUTE FUNCTION notify_new_follower();
 
--- Trigger 2: Like Notification
 CREATE OR REPLACE FUNCTION notify_post_like()
 RETURNS TRIGGER AS $$
 DECLARE
     post_owner_id TEXT;
 BEGIN
     SELECT user_id INTO post_owner_id FROM posts WHERE id = NEW.post_id;
-    
     IF NEW.user_id != post_owner_id THEN
         INSERT INTO notifications (user_id, type, title, message, actor_id, actor_name, actor_avatar, reference_id)
         SELECT
@@ -372,7 +366,6 @@ BEGIN
         FROM users u
         WHERE u.id = NEW.user_id;
     END IF;
-    
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -382,14 +375,12 @@ AFTER INSERT ON post_likes
 FOR EACH ROW
 EXECUTE FUNCTION notify_post_like();
 
--- Trigger 3: Comment Notification
 CREATE OR REPLACE FUNCTION notify_post_comment()
 RETURNS TRIGGER AS $$
 DECLARE
     post_owner_id TEXT;
 BEGIN
     SELECT user_id INTO post_owner_id FROM posts WHERE id = NEW.post_id;
-    
     IF NEW.user_id != post_owner_id THEN
         INSERT INTO notifications (user_id, type, title, message, actor_id, actor_name, actor_avatar, reference_id)
         SELECT
@@ -404,7 +395,6 @@ BEGIN
         FROM users u
         WHERE u.id = NEW.user_id;
     END IF;
-    
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
@@ -414,7 +404,6 @@ AFTER INSERT ON comments
 FOR EACH ROW
 EXECUTE FUNCTION notify_post_comment();
 
--- Trigger 4: Message Notification
 CREATE OR REPLACE FUNCTION notify_new_message()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -451,11 +440,7 @@ FOR EACH ROW
 EXECUTE FUNCTION notify_new_message();
 
 -- ============================================
--- DONE! All tables, policies, and triggers created
+-- DONE!
 -- ============================================
 
--- Test by querying tables
-SELECT 'Database setup complete!' as status;
-SELECT table_name FROM information_schema.tables 
-WHERE table_schema = 'public' 
-ORDER BY table_name;
+SELECT 'Database setup complete! All tables, indexes, RLS policies, and triggers created.' as status;
