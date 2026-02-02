@@ -100,6 +100,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (email: string, pass: string) => {
         await signInWithEmailAndPassword(auth, email, pass);
+
+        // Send login notification email
+        try {
+            await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'login',
+                    to: email,
+                    name: auth.currentUser?.displayName || 'User',
+                    location: 'Web Browser',
+                    time: new Date().toLocaleString()
+                })
+            });
+            console.log('📧 Login notification email sent');
+        } catch (error) {
+            console.error('Failed to send login notification:', error);
+            // Don't block login if email fails
+        }
     };
 
     const signup = async (name: string, email: string, pass: string) => {
@@ -121,6 +140,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: email,
             avatar: randomAvatar,
         });
+
+        // 4. Send welcome email
+        try {
+            await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'welcome',
+                    to: email,
+                    name: name
+                })
+            });
+            console.log('📧 Welcome email sent');
+        } catch (error) {
+            console.error('Failed to send welcome email:', error);
+            // Don't block signup if email fails
+        }
     };
 
     const loginWithGoogle = async () => {
