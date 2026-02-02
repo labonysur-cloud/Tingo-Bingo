@@ -31,7 +31,9 @@ export interface Post {
     caption: string;
     likesCount: number;
     commentsCount: number;
+    savesCount?: number;
     isLikedByMe: boolean;
+    isSavedByMe?: boolean;
     createdAt: string;
     comments?: Comment[];
 }
@@ -60,11 +62,13 @@ interface SocialContextType {
     posts: Post[];
     addPost: (caption: string, image?: string, petId?: string) => Promise<void>;
     likePost: (postId: string) => Promise<void>;
+    savePost: (postId: string) => Promise<void>;
     getComments: (postId: string) => Promise<Comment[]>;
     addComment: (postId: string, text: string, parentCommentId?: string) => Promise<void>;
     likeComment: (commentId: string, postId: string) => Promise<void>;
     deletePost: (postId: string) => Promise<void>;
     deleteComment: (commentId: string, postId: string) => Promise<void>;
+    getSavedPosts: () => Promise<Post[]>;
     stories: Story[];
     addStory: (file: File, type: 'image' | 'video', caption?: string) => Promise<void>;
     deleteStory: (storyId: string) => Promise<void>;
@@ -169,12 +173,16 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                     image_url,
                     likes_count,
                     comments_count,
+                    saves_count,
                     created_at,
                     users:user_id (
                         name,
                         avatar
                     ),
                     post_likes!left (
+                        user_id
+                    ),
+                    post_saves!left (
                         user_id
                     )
                 `)
@@ -186,6 +194,10 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                 // Check if current user has liked this post
                 const postLikes = post.post_likes || [];
                 const isLiked = user ? postLikes.some((like: any) => like.user_id === user.id) : false;
+
+                // Check if current user has saved this post
+                const postSaves = post.post_saves || [];
+                const isSaved = user ? postSaves.some((save: any) => save.user_id === user.id) : false;
 
                 console.log(`📊 Post ${post.id.substring(0, 8)}: likes_count=${post.likes_count}, comments_count=${post.comments_count}, isLikedByMe=${isLiked}`);
 
@@ -202,7 +214,9 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                     caption: post.content || "",
                     likesCount: post.likes_count || 0,
                     commentsCount: post.comments_count || 0,
+                    savesCount: post.saves_count || 0,
                     isLikedByMe: isLiked,
+                    isSavedByMe: isSaved,
                     createdAt: post.created_at,
                     comments: comments // Add comments to post
                 };
@@ -607,6 +621,144 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     };
 
     // ============================================
+    // SAVE/UNSAVE POST
+    // ============================================
+    const savePost = async (postId: string) => {
+        if (!user) {
+            showToast.error('Please log in to save posts');
+            return;
+        }
+
+        try {
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
+
+            const authSupabase = await getAuthenticatedSupabase();
+
+            if (post.isSavedByMe) {
+                // Unsave
+                const { error } = await authSupabase
+                    .from('post_saves')
+                    .delete()
+                    .eq('post_id', postId)
+                    .eq('user_id', user.id);
+
+                if (error) throw error;
+                showToast.success('Post removed from Moodboard');
+            } else {
+                // Save
+                const { error } = await authSupabase
+                    .from('post_saves')
+                    .insert({
+                        post_id: postId,
+                        user_id: user.id
+                    });
+
+                if (error) throw error;
+                showToast.success('Post saved to Moodboard');
+            }
+
+            // Optimistic UI update
+            setPosts(prev => prev.map(p => {
+                if (p.id === postId) {
+                    const newIsSaved = !p.isSavedByMe;
+                    const newSavesCount = newIsSaved
+                        ? (p.savesCount || 0) + 1
+                        : Math.max(0, (p.savesCount || 0) - 1);
+
+                    return {
+                        ...p,
+                        isSavedByMe: newIsSaved,
+                        savesCount: newSavesCount
+                    };
+                }
+                return p;
+            }));
+
+        } catch (error: any) {
+            console.error("❌ Error saving post:", error);
+            showToast.error('Failed to save post');
+        }
+    };
+
+    // ============================================
+    // GET SAVED POSTS (for Moodboard)
+    // ============================================
+    const getSavedPosts = async (): Promise<Post[]> => {
+        if (!user) return [];
+
+        try {
+            const { data, error } = await supabase
+                .from('post_saves')
+                .select(`
+                    created_at,
+                    posts (
+                        id,
+                        user_id,
+                        pet_id,
+                        content,
+                        image_url,
+                        likes_count,
+                        comments_count,
+                        saves_count,
+                        created_at,
+                        users:user_id (
+                            name,
+                            avatar
+                        ),
+                        post_likes!left (
+                            user_id
+                        ),
+                        post_saves!left (
+                            user_id
+                        )
+                    )
+                `)
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            const transformedPosts: Post[] = (await Promise.all((data || []).map(async (save: any) => {
+                const post = save.posts;
+                if (!post) return null;
+
+                const postLikes = post.post_likes || [];
+                const isLiked = postLikes.some((like: any) => like.user_id === user.id);
+
+                const postSaves = post.post_saves || [];
+                const isSaved = postSaves.some((s: any) => s.user_id === user.id);
+
+                const comments = await getComments(post.id);
+
+                return {
+                    id: post.id,
+                    userId: post.user_id,
+                    userName: post.users?.name || "Unknown User",
+                    userAvatar: post.users?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user_id}`,
+                    petId: post.pet_id,
+                    image: post.image_url,
+                    caption: post.content || "",
+                    likesCount: post.likes_count || 0,
+                    commentsCount: post.comments_count || 0,
+                    savesCount: post.saves_count || 0,
+                    isLikedByMe: isLiked,
+                    isSavedByMe: isSaved,
+                    createdAt: post.created_at,
+                    comments: comments
+                };
+            }))).filter(p => p !== null) as Post[];
+
+            return transformedPosts;
+
+        } catch (error) {
+            console.error("❌ Error fetching saved posts:", error);
+            return [];
+        }
+    };
+
+
+    // ============================================
     // GET COMMENTS FOR POST
     // ============================================
     const getComments = async (postId: string): Promise<Comment[]> => {
@@ -903,11 +1055,13 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             posts,
             addPost,
             likePost,
+            savePost,
             getComments,
             addComment,
             likeComment,
             deletePost,
             deleteComment,
+            getSavedPosts,
             stories,
             addStory,
             highlights,

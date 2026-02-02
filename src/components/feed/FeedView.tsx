@@ -9,6 +9,7 @@ import CreatePost from "./CreatePost";
 import AddStoryModal from "../stories/AddStoryModal";
 import StoryViewer from "../stories/StoryViewer";
 import LikeButton from "../ui/LikeButton";
+import SaveButton from "../ui/SaveButton";
 import NotificationBell from "../notifications/NotificationBell";
 import CommentItem from "./CommentItem";
 import Link from "next/link";
@@ -17,7 +18,7 @@ import { useRouter } from "next/navigation";
 
 export default function FeedView() {
     const { user } = useAuth();
-    const { posts, addPost, likePost, addComment, likeComment, stories } = useSocial();
+    const { posts, addPost, likePost, savePost, addComment, likeComment, stories } = useSocial();
     const { startConversation } = useChat();
     const router = useRouter();
 
@@ -250,6 +251,11 @@ export default function FeedView() {
                                         <MessageCircle className="w-6 h-6" />
                                         <span className="font-bold text-sm">{post.commentsCount || 0}</span>
                                     </button>
+                                    <SaveButton
+                                        isSaved={post.isSavedByMe || false}
+                                        onClick={() => savePost(post.id)}
+                                        size="md"
+                                    />
                                 </div>
 
                                 {/* Comments Section - Toggleable */}

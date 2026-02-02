@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import FollowListModal from "./FollowListModal";
 import CommentItem from "../feed/CommentItem";
 import LikeButton from "../ui/LikeButton";
+import SaveButton from "../ui/SaveButton";
 
 interface Post {
     id: string;
@@ -28,7 +29,7 @@ interface ProfileViewProps {
 
 export default function ProfileView({ userId }: ProfileViewProps) {
     const { user: currentUser, logout, isLoading: authLoading } = useAuth();
-    const { addComment, likeComment, likePost, getComments, posts: allPosts } = useSocial();
+    const { addComment, likeComment, likePost, savePost, getComments, posts: allPosts } = useSocial();
     const router = useRouter();
 
     // Determine which user to show
@@ -533,6 +534,11 @@ export default function ProfileView({ userId }: ProfileViewProps) {
                                         <MessageCircle className="w-6 h-6" />
                                         <span className="font-bold text-sm">{post.commentsCount || 0}</span>
                                     </button>
+                                    <SaveButton
+                                        isSaved={post.isSavedByMe || false}
+                                        onClick={() => savePost(post.id)}
+                                        size="md"
+                                    />
                                 </div>
 
                                 {/* Comments Section */}
