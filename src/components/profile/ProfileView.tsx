@@ -10,6 +10,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import FollowListModal from "./FollowListModal";
+import CommentItem from "../feed/CommentItem";
+import LikeButton from "../feed/LikeButton";
 
 interface Post {
     id: string;
@@ -26,7 +28,7 @@ interface ProfileViewProps {
 
 export default function ProfileView({ userId }: ProfileViewProps) {
     const { user: currentUser, logout, isLoading: authLoading } = useAuth();
-    const { addComment } = useSocial();
+    const { addComment, likeComment, likePost, getComments, posts: allPosts } = useSocial();
     const router = useRouter();
 
     // Determine which user to show
@@ -40,7 +42,7 @@ export default function ProfileView({ userId }: ProfileViewProps) {
     const [posts, setPosts] = useState<Post[]>([]);
     const [loadingPosts, setLoadingPosts] = useState(true);
     const [showComments, setShowComments] = useState<{ [key: string]: boolean }>({});
-    const [commentText, setCommentText] = useState<{ [key: string]: string }>({});
+    const [commentText, setCommentText] = useState<{ [key: string]: string | undefined }>({});
     const [refreshTrigger, setRefreshTrigger] = useState(0); // Add refresh trigger
 
     // Follow System State
@@ -520,19 +522,115 @@ export default function ProfileView({ userId }: ProfileViewProps) {
                         No posts yet.
                     </div>
                 ) : (
-                    posts.map((post) => (
+                    allPosts.filter(p => p.userId === targetUserId).map((post) => (
                         <div key={post.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                            {post.image_url && (
+                            {/* Post Image */}
+                            {post.image && (
                                 <div className="relative w-full bg-gray-100">
-                                    <img src={post.image_url} alt="Post" className="w-full object-contain max-h-[500px]" />
+                                    <img src={post.image} alt="Post" className="w-full object-contain max-h-[500px]" />
                                 </div>
                             )}
+
+                            {/* Post Content */}
                             <div className="p-5">
-                                <p className="text-gray-900 mb-3 leading-relaxed">{post.content}</p>
-                                <div className="flex items-center gap-4 text-xs text-gray-500">
-                                    <span className="flex items-center gap-1"><Heart className="w-3 h-3 text-red-500 fill-red-500" /> {post.likes_count}</span>
-                                    <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                                {post.caption && (
+                                    <p className="text-gray-900 mb-4 leading-relaxed whitespace-pre-wrap">{post.caption}</p>
+                                )}
+
+                                {/* Action Buttons */}
+                                <div className="flex items-center gap-6 mb-2">
+                                    <LikeButton
+                                        postId={post.id}
+                                        size="md"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            const newShowComments = { ...showComments };
+                                            newShowComments[post.id] = !newShowComments[post.id];
+                                            setShowComments(newShowComments);
+                                        }}
+                                        className="flex items-center gap-1.5 text-gray-500 hover:text-blue-500 transition-colors"
+                                    >
+                                        <MessageCircle className="w-6 h-6" />
+                                        <span className="font-bold text-sm">{post.commentsCount || 0}</span>
+                                    </button>
                                 </div>
+
+                                {/* Comments Section */}
+                                {showComments[post.id] && (
+                                    <div className="border-t border-gray-100 bg-gray-50 -mx-5 -mb-5 mt-4 animate-in slide-in-from-top-2 duration-300">
+                                        {/* Comments List */}
+                                        {post.comments && post.comments.length > 0 && (
+                                            <div className="px-4 py-4 max-h-96 overflow-y-auto">
+                                                {post.comments.map((comment) => (
+                                                    <CommentItem
+                                                        key={comment.id}
+                                                        comment={comment}
+                                                        postId={post.id}
+                                                        onReply={(commentId, parentName) => {
+                                                            setCommentText({
+                                                                ...commentText,
+                                                                [post.id]: `@${parentName} `,
+                                                                [`${post.id}_replyTo`]: commentId
+                                                            });
+                                                        }}
+                                                        onLike={(commentId, postId) => {
+                                                            likeComment(commentId, postId);
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Comment Input */}
+                                        <div className="px-4 py-3 border-t border-gray-100">
+                                            <div className="flex gap-2">
+                                                <img
+                                                    src={currentUser?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest"}
+                                                    alt="Your avatar"
+                                                    className="w-8 h-8 rounded-full flex-shrink-0"
+                                                />
+                                                <div className="flex-1 flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Add a comment..."
+                                                        value={commentText[post.id] || ""}
+                                                        onChange={(e) => setCommentText({ ...commentText, [post.id]: e.target.value })}
+                                                        onKeyPress={(e) => {
+                                                            if (e.key === 'Enter' && commentText[post.id]?.trim()) {
+                                                                const replyToId = commentText[`${post.id}_replyTo`] as string | undefined;
+                                                                addComment(post.id, commentText[post.id] ?? "", replyToId);
+                                                                setCommentText({
+                                                                    ...commentText,
+                                                                    [post.id]: "",
+                                                                    [`${post.id}_replyTo`]: undefined
+                                                                });
+                                                            }
+                                                        }}
+                                                        className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            if (commentText[post.id]?.trim()) {
+                                                                const replyToId = commentText[`${post.id}_replyTo`] as string | undefined;
+                                                                addComment(post.id, commentText[post.id] ?? "", replyToId);
+                                                                setCommentText({
+                                                                    ...commentText,
+                                                                    [post.id]: "",
+                                                                    [`${post.id}_replyTo`]: undefined
+                                                                });
+                                                            }
+                                                        }}
+                                                        disabled={!commentText[post.id]?.trim()}
+                                                        className="bg-primary text-white p-2 rounded-full hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                    >
+                                                        <Send className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))

@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSocial } from "@/context/SocialContext";
 import { useChat } from "@/context/ChatContext";
 // import { uploadToCloudinary } from "@/lib/cloudinary";  // No longer needed here
-import { Heart, MessageCircle, Share2, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search } from "lucide-react";
+import { Heart, MessageCircle, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search } from "lucide-react";
 import CreatePost from "./CreatePost";
 import AddStoryModal from "../stories/AddStoryModal";
 import StoryViewer from "../stories/StoryViewer";
@@ -249,9 +249,6 @@ export default function FeedView() {
                                     >
                                         <MessageCircle className="w-6 h-6" />
                                         <span className="font-bold text-sm">{post.commentsCount || 0}</span>
-                                    </button>
-                                    <button className="ml-auto text-gray-400 hover:text-gray-600">
-                                        <Share2 className="w-5 h-5" />
                                     </button>
                                 </div>
 
