@@ -172,16 +172,23 @@ export default function EditProfilePage() {
             // 1. Upload Owner Avatar
             if (avatar) {
                 try {
+                    console.log('📤 Uploading avatar to Cloudinary...');
                     photoURL = await uploadToCloudinary(avatar);
+                    console.log('✅ Avatar uploaded successfully:', photoURL);
+
                     if (auth.currentUser) {
                         await updateProfile(auth.currentUser, { photoURL });
+                        console.log('✅ Firebase profile updated with new avatar');
                     }
                 } catch (uploadError) {
-                    console.error("Avatar upload failed:", uploadError);
+                    console.error("❌ Avatar upload failed:", uploadError);
+                    alert(`Failed to upload avatar: ${uploadError}`);
+                    throw uploadError; // Stop if avatar upload fails
                 }
             }
 
-            // 2. Update Owner Profile
+            // 2. Update Owner Profile in Supabase
+            console.log('💾 Saving profile to Supabase with avatar:', photoURL);
             const { error: upsertError } = await supabase
                 .from('users')
                 .upsert({
@@ -196,6 +203,7 @@ export default function EditProfilePage() {
                 }, { onConflict: 'id' });
 
             if (upsertError) throw upsertError;
+            console.log('✅ Profile saved to Supabase successfully!');
 
             // 3. Save Pet Data (Only if name is provided)
             if (petName.trim()) {
@@ -250,6 +258,11 @@ export default function EditProfilePage() {
             }
 
             alert("Saved successfully!");
+
+            // CRITICAL FIX: Force Next.js to refetch data so ProfileView shows new avatar
+            router.refresh();
+
+            // Navigate back to profile
             router.push("/profile");
 
         } catch (error: any) {
