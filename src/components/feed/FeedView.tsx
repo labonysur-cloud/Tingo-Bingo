@@ -22,7 +22,7 @@ export default function FeedView() {
     const router = useRouter();
 
     const [showComments, setShowComments] = useState<{ [key: string]: boolean }>({});
-    const [commentText, setCommentText] = useState<{ [key: string]: string }>({});
+    const [commentText, setCommentText] = useState<{ [key: string]: string | undefined }>({});
     const [isAddingStory, setIsAddingStory] = useState(false);
     const [viewingStories, setViewingStories] = useState<string | null>(null); // userId of stories being viewed
 

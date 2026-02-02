@@ -59,7 +59,7 @@ interface SocialContextType {
     addPost: (caption: string, image?: string, petId?: string) => Promise<void>;
     likePost: (postId: string) => Promise<void>;
     getComments: (postId: string) => Promise<Comment[]>;
-    addComment: (postId: string, text: string) => Promise<void>;
+    addComment: (postId: string, text: string, parentCommentId?: string) => Promise<void>;
     deletePost: (postId: string) => Promise<void>;
     deleteComment: (commentId: string, postId: string) => Promise<void>;
     stories: Story[];
