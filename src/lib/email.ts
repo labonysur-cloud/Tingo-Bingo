@@ -173,3 +173,55 @@ export function getPasswordChangeTemplate(name: string): string {
 </html>
     `;
 }
+
+export function getAccountDeletedTemplate(name: string): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Arial', sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #DC2626; padding: 30px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { color: white; margin: 0; font-size: 24px; }
+        .content { background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .info { background: #FEE2E2; padding: 15px; border-radius: 8px; border-left: 4px solid #DC2626; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗑️ Account Deleted</h1>
+        </div>
+        <div class="content">
+            <p>Hi ${name},</p>
+            
+            <div class="info">
+                <strong>Your TingoBingo account has been permanently deleted</strong>
+            </div>
+            
+            <p>All your data has been removed from our servers, including:</p>
+            <ul>
+                <li>Your profile information</li>
+                <li>All your posts and photos</li>
+                <li>Your pets' profiles</li>
+                <li>Comments and likes</li>
+                <li>Followers and following</li>
+            </ul>
+            
+            <p>We're sorry to see you go! If you change your mind, you're always welcome to create a new account and rejoin our community.</p>
+            
+            <p>Thank you for being part of TingoBingo. 💙</p>
+            
+            <p><strong>The TingoBingo Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>🐾 TingoBingo - The Pet's Social Media</p>
+            <p>This is a confirmation of your account deletion request.</p>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+}

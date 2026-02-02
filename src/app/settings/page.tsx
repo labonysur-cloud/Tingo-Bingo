@@ -1,17 +1,39 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { ArrowLeft, ChevronRight, User, HelpCircle, Info, LogOut, Shield, Heart } from "lucide-react";
+import { ArrowLeft, ChevronRight, User, HelpCircle, Info, LogOut, Shield, Heart, Trash2, AlertTriangle, X, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function SettingsView() {
-    const { user, logout } = useAuth();
+    const { user, logout, deleteAccount } = useAuth();
     const router = useRouter();
+
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
 
     const handleLogout = async () => {
         await logout();
         router.replace("/");
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!user) return;
+
+        setDeleteLoading(true);
+        setDeleteError('');
+
+        try {
+            await deleteAccount();
+            // User will be automatically logged out
+            router.replace('/');
+        } catch (error: any) {
+            console.error('Delete error:', error);
+            setDeleteError(error.message || 'Failed to delete account');
+            setDeleteLoading(false);
+        }
     };
 
     return (
@@ -77,6 +99,26 @@ export default function SettingsView() {
                     </div>
                 </section>
 
+                {/* Danger Zone */}
+                <section>
+                    <h2 className="text-sm font-bold text-red-600 uppercase tracking-wider mb-2 px-1 flex items-center gap-1">
+                        <AlertTriangle className="w-4 h-4" />
+                        Danger Zone
+                    </h2>
+                    <div className="bg-white rounded-2xl shadow-sm border-2 border-red-200 overflow-hidden p-4">
+                        <p className="text-sm text-gray-600 mb-4">
+                            Once you delete your account, there is no going back. All your data will be permanently removed.
+                        </p>
+                        <button
+                            onClick={() => setShowDeleteModal(true)}
+                            className="flex items-center justify-center gap-2 bg-red-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-red-700 transition-colors w-full"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                            Delete Account
+                        </button>
+                    </div>
+                </section>
+
                 {/* App Info */}
                 <section className="text-center py-4">
                     <button
@@ -94,6 +136,76 @@ export default function SettingsView() {
                     </div>
                 </section>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold text-red-600 flex items-center gap-2">
+                                <AlertTriangle className="w-6 h-6" />
+                                Delete Account?
+                            </h2>
+                            <button
+                                onClick={() => setShowDeleteModal(false)}
+                                disabled={deleteLoading}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="mb-6">
+                            <p className="text-gray-700 mb-3">
+                                This action is <strong>permanent</strong> and <strong>cannot be undone</strong>.
+                            </p>
+                            <p className="text-sm text-gray-600 mb-3">
+                                All your data will be permanently deleted:
+                            </p>
+                            <ul className="list-disc ml-5 mb-4 text-sm text-gray-600 space-y-1">
+                                <li>Your profile information</li>
+                                <li>All your posts and photos</li>
+                                <li>Your pets' profiles</li>
+                                <li>Your comments and likes</li>
+                                <li>Your followers and following</li>
+                            </ul>
+
+                            {deleteError && (
+                                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg mb-3 text-sm">
+                                    {deleteError}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowDeleteModal(false)}
+                                disabled={deleteLoading}
+                                className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300 transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteAccount}
+                                disabled={deleteLoading}
+                                className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {deleteLoading ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Deleting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 className="w-5 h-5" />
+                                        Delete Forever
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

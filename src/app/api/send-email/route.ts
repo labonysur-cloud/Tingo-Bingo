@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendEmail, getWelcomeEmailTemplate, getLoginNotificationTemplate, getPasswordChangeTemplate } from '@/lib/email';
+import { sendEmail, getWelcomeEmailTemplate, getLoginNotificationTemplate, getPasswordChangeTemplate, getAccountDeletedTemplate } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
     try {
@@ -31,6 +31,11 @@ export async function POST(request: NextRequest) {
             case 'password-change':
                 subject = '✅ Password Changed Successfully';
                 html = getPasswordChangeTemplate(name);
+                break;
+
+            case 'account-deleted':
+                subject = '🗑️ Account Deleted - Confirmation';
+                html = getAccountDeletedTemplate(name);
                 break;
 
             default:

@@ -11,6 +11,7 @@ import {
     onAuthStateChanged,
     updateProfile,
     sendPasswordResetEmail,
+    deleteUser, // Added deleteUser
     User as FirebaseUser
 } from "firebase/auth";
 
@@ -31,6 +32,7 @@ interface AuthContextType {
     loginWithGoogle: () => Promise<void>;
     logout: () => Promise<void>;
     resetPassword: (email: string) => Promise<void>;
+    deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -172,8 +174,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await sendPasswordResetEmail(auth, email);
     };
 
+    const deleteAccount = async () => {
+        if (!auth.currentUser || !user) {
+            throw new Error('No user logged in');
+        }
+
+        const userId = auth.currentUser.uid;
+
+        // Step 1: Delete from Supabase via API (CASCADE deletes all related data)
+        const response = await fetch('/api/delete-account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete account');
+        }
+
+        // Step 2: Delete from Firebase Auth
+        await deleteUser(auth.currentUser);
+
+        // Step 3: Clear local state
+        setUser(null);
+    };
+
     return (
-        <AuthContext.Provider value={{ user, isLoading, login, signup, loginWithGoogle, logout, resetPassword }}>
+        <AuthContext.Provider value={{ user, isLoading, login, signup, loginWithGoogle, logout, resetPassword, deleteAccount }}>
             {children}
         </AuthContext.Provider>
     );
