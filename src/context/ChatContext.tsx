@@ -50,6 +50,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [refreshMessages, setRefreshMessages] = useState(0); // Trigger to refetch messages
 
     // Real-time subscription ref
     const subscriptionRef = useRef<any>(null);
