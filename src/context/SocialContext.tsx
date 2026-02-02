@@ -15,6 +15,8 @@ export interface Comment {
     userAvatar: string;
     text: string;
     createdAt: string;
+    parent_comment_id?: string | null; // For nested replies
+    replies?: Comment[]; // Nested replies
 }
 
 export interface Post {
@@ -86,7 +88,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         fetchStories();
         fetchHighlights();
 
-        // Real-time subscription for posts
+        // Real-time subscription for posts, likes, and comments
         const postsChannel = supabase
             .channel('posts-changes')
             .on(
@@ -97,7 +99,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                     table: 'posts'
                 },
                 (payload) => {
-                    console.log('Post change:', payload);
+                    console.log('📝 Post change:', payload);
                     fetchPosts();
                 }
             )
@@ -109,8 +111,20 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                     table: 'post_likes'
                 },
                 (payload) => {
-                    console.log('Like change:', payload);
-                    fetchPosts();
+                    console.log('❤️ Like change:', payload);
+                    fetchPosts(); // Refresh to get updated like counts
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'comments'
+                },
+                (payload) => {
+                    console.log('💬 Comment change:', payload);
+                    fetchPosts(); // Refresh to get updated comment counts
                 }
             )
             .subscribe();
@@ -585,6 +599,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                     user_id,
                     content,
                     created_at,
+                    parent_comment_id,
                     users:user_id (
                         name,
                         avatar
@@ -595,15 +610,43 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
             if (error) throw error;
 
-            return (data || []).map((comment: any) => ({
+            // Transform and organize comments with replies
+            const allComments: Comment[] = (data || []).map((comment: any) => ({
                 id: comment.id,
                 postId: comment.post_id,
                 userId: comment.user_id,
-                userName: comment.users?.name || "Unknown",
+                userName: comment.users?.name || "Unknown User",
                 userAvatar: comment.users?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`,
                 text: comment.content,
-                createdAt: comment.created_at
+                createdAt: comment.created_at,
+                parent_comment_id: comment.parent_comment_id,
+                replies: []
             }));
+
+            // Organize comments into parent-child structure
+            const topLevelComments: Comment[] = [];
+            const commentMap = new Map<string, Comment>();
+
+            // First pass: create map of all comments
+            allComments.forEach(comment => {
+                commentMap.set(comment.id, comment);
+            });
+
+            // Second pass: organize into hierarchy
+            allComments.forEach(comment => {
+                if (comment.parent_comment_id) {
+                    // This is a reply
+                    const parent = commentMap.get(comment.parent_comment_id);
+                    if (parent && parent.replies) {
+                        parent.replies.push(comment);
+                    }
+                } else {
+                    // This is a top-level comment
+                    topLevelComments.push(comment);
+                }
+            });
+
+            return topLevelComments;
         } catch (error) {
             console.error("Error fetching comments:", error);
             return [];
@@ -613,7 +656,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     // ============================================
     // ADD COMMENT
     // ============================================
-    const addComment = async (postId: string, text: string) => {
+    const addComment = async (postId: string, text: string, parentCommentId?: string) => {
         if (!user) {
             showToast.error('Please log in to comment');
             return;
@@ -633,20 +676,23 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                 .insert({
                     post_id: postId,
                     user_id: user.id,
-                    content: sanitized
+                    content: sanitized,
+                    parent_comment_id: parentCommentId || null
                 });
 
             if (error) throw error;
 
-            showToast.success('Comment added!');
+            showToast.success(parentCommentId ? 'Reply added!' : 'Comment added!');
 
-            // Update comments count optimistically
-            setPosts(prev => prev.map(p => {
-                if (p.id === postId) {
-                    return { ...p, commentsCount: p.commentsCount + 1 };
-                }
-                return p;
-            }));
+            // Update comments count optimistically (only for top-level comments)
+            if (!parentCommentId) {
+                setPosts(prev => prev.map(p => {
+                    if (p.id === postId) {
+                        return { ...p, commentsCount: p.commentsCount + 1 };
+                    }
+                    return p;
+                }));
+            }
         } catch (error: any) {
             console.error("❌ Error adding comment:", error);
             showToast.error('Failed to add comment');
