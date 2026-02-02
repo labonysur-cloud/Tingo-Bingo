@@ -7,7 +7,7 @@ import { uploadToCloudinary } from "@/lib/cloudinary";
 
 export interface Message {
     id: string;
-    conversation_id: string;
+    chat_id: string;
     sender_id: string;
     content: string | null;
     media_url: string | null;
@@ -54,48 +54,32 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     // Real-time subscription ref
     const subscriptionRef = useRef<any>(null);
 
-    // 1. Fetch Conversations
+    // 1. Fetch Conversations (using chats table)
     const fetchConversations = async () => {
         if (!user) return;
 
         try {
-            // Get all conversations user is part of
-            const { data: participations, error: partError } = await supabase
-                .from('conversation_participants')
-                .select('conversation_id')
-                .eq('user_id', user.id);
+            // Get all chats where user is a participant
+            const { data: chats, error: chatsError } = await supabase
+                .from('chats')
+                .select('*')
+                .or(`participant_1.eq.${user.id},participant_2.eq.${user.id}`)
+                .order('updated_at', { ascending: false });
 
-            if (partError) throw partError;
+            if (chatsError) throw chatsError;
 
-            const conversationIds = participations.map(p => p.conversation_id);
-
-            if (conversationIds.length === 0) {
+            if (!chats || chats.length === 0) {
                 setConversations([]);
                 setIsLoading(false);
                 return;
             }
 
-            // Fetch conversation details + participants + last message
-            const { data: convs, error: convError } = await supabase
-                .from('conversations')
-                .select(`
-                    id,
-                    updated_at,
-                    conversation_participants (
-                        user_id
-                    )
-                `)
-                .in('id', conversationIds)
-                .order('updated_at', { ascending: false });
+            // Enrich with user details and last message
+            const enrichedConversations = await Promise.all(chats.map(async (chat: any) => {
+                // Determine the other user
+                const otherUserId = chat.participant_1 === user.id ? chat.participant_2 : chat.participant_1;
 
-            if (convError) throw convError;
-
-            // Enrich with user details (could be optimized with a view or better query)
-            // For now, we fetch user details manually to be safe
-            const enrichedConversations = await Promise.all(convs.map(async (conv: any) => {
-                const participantIds = conv.conversation_participants.map((p: any) => p.user_id);
-                const otherUserId = participantIds.find((pid: string) => pid !== user.id) || user.id; // Self chat fallback
-
+                // Fetch other user's data
                 const { data: userData } = await supabase
                     .from('users')
                     .select('name, avatar')
@@ -106,13 +90,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 const { data: lastMsg } = await supabase
                     .from('messages')
                     .select('*')
-                    .eq('conversation_id', conv.id)
+                    .eq('chat_id', chat.id)
                     .order('created_at', { ascending: false })
                     .limit(1)
                     .single();
 
                 return {
-                    id: conv.id,
+                    id: chat.id,
                     participants: [{
                         user_id: otherUserId,
                         user: {
@@ -143,7 +127,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             const { data, error } = await supabase
                 .from('messages')
                 .select('*')
-                .eq('conversation_id', activeConversationId)
+                .eq('chat_id', activeConversationId)
                 .order('created_at', { ascending: true });
 
             if (error) {
@@ -162,7 +146,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'messages',
-                filter: `conversation_id=eq.${activeConversationId}`
+                filter: `chat_id=eq.${activeConversationId}`
             }, (payload) => {
                 const newMessage = payload.new as Message;
                 setMessages(prev => [...prev, newMessage]);
@@ -198,7 +182,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             }
 
             const newMessage = {
-                conversation_id: activeConversationId,
+                chat_id: activeConversationId,
                 sender_id: user.id,
                 content: content || null,
                 media_url: mediaUrl,
@@ -213,9 +197,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             if (error) throw error;
 
-            // Update conversation timestamp
+            // Update chat timestamp
             await supabase
-                .from('conversations')
+                .from('chats')
                 .update({ updated_at: new Date().toISOString() })
                 .eq('id', activeConversationId);
 
@@ -234,34 +218,46 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
         try {
             // Check existing locally first
-            // Robust check: finds ANY conversation where the participant exists
             const existing = conversations.find(c =>
                 c.participants.some(p => p.user_id === targetUserId)
             );
 
             if (existing) {
-                console.log("Found existing conversation:", existing.id);
+                console.log("Found existing chat:", existing.id);
                 setActiveConversationId(existing.id);
                 return existing.id;
             }
 
-            // Call RPC (or manual check/insert if RPC fails)
-            const { data: convId, error } = await supabase
-                .rpc('get_or_create_conversation', {
-                    user_a: user.id,
-                    user_b: targetUserId
-                });
+            // Check if chat exists in database
+            const { data: existingChats } = await supabase
+                .from('chats')
+                .select('id')
+                .or(`and(participant_1.eq.${user.id},participant_2.eq.${targetUserId}),and(participant_1.eq.${targetUserId},participant_2.eq.${user.id})`)
+                .limit(1)
+                .single();
 
-            if (error) {
-                // Fallback if RPC permissions fail (though we set them up)
-                console.error("RPC Error:", error);
-                throw error;
+            if (existingChats) {
+                setActiveConversationId(existingChats.id);
+                await fetchConversations();
+                return existingChats.id;
             }
+
+            // Create new chat
+            const { data: newChat, error } = await supabase
+                .from('chats')
+                .insert({
+                    participant_1: user.id,
+                    participant_2: targetUserId
+                })
+                .select('id')
+                .single();
+
+            if (error) throw error;
 
             // Refresh list
             await fetchConversations();
-            setActiveConversationId(convId);
-            return convId;
+            setActiveConversationId(newChat.id);
+            return newChat.id;
         } catch (error) {
             console.error("Error starting conversation:", error);
             throw error;
