@@ -615,6 +615,8 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
             if (error) throw error;
 
+            console.log(`💬 Fetched ${data?.length || 0} total comments for post ${postId.substring(0, 8)}`);
+
             // Transform and organize comments with replies
             const allComments: Comment[] = (data || []).map((comment: any) => ({
                 id: comment.id,
@@ -644,10 +646,20 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                     const parent = commentMap.get(comment.parent_comment_id);
                     if (parent && parent.replies) {
                         parent.replies.push(comment);
+                        console.log(`  ↳ Reply "${comment.text.substring(0, 20)}..." nested under parent`);
+                    } else {
+                        console.warn(`  ⚠️ Parent comment ${comment.parent_comment_id} not found for reply ${comment.id}`);
                     }
                 } else {
                     // This is a top-level comment
                     topLevelComments.push(comment);
+                }
+            });
+
+            console.log(`📊 Organized into ${topLevelComments.length} top-level comments`);
+            topLevelComments.forEach(comment => {
+                if (comment.replies && comment.replies.length > 0) {
+                    console.log(`  💬 "${comment.text.substring(0, 30)}..." has ${comment.replies.length} replies`);
                 }
             });
 
