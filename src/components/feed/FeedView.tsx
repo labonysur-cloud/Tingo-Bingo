@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSocial } from "@/context/SocialContext";
 import { useChat } from "@/context/ChatContext";
 // import { uploadToCloudinary } from "@/lib/cloudinary";  // No longer needed here
-import { Heart, MessageCircle, Share2, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search } from "lucide-react";
+import { Heart, MessageCircle, Share2, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search, Bell } from "lucide-react";
 import CreatePost from "./CreatePost";
 import AddStoryModal from "../stories/AddStoryModal";
 import StoryViewer from "../stories/StoryViewer";
@@ -52,16 +52,33 @@ export default function FeedView() {
 
     return (
         <main className="pb-24 bg-gray-50 min-h-screen">
-            {/* Modern Header */}
-            <header className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-gray-100 z-10 px-4 py-3 flex justify-between items-center shadow-sm">
-                <div className="flex items-center gap-2">
-                    <img src="/logo.png" alt="Logo" className="w-8 h-8 rounded-lg shadow-sm" />
-                    <h1 className="text-xl font-bold tracking-tight text-gray-800">TingoBingo</h1>
+            {/* Modern Header - Facebook Style */}
+            <header className="sticky top-0 bg-gradient-to-r from-orange-500 to-pink-500 z-10 px-4 py-4 shadow-lg">
+                <div className="flex justify-between items-center">
+                    {/* Logo - Big and Prominent */}
+                    <div className="flex items-center gap-3">
+                        <img src="/logo.png" alt="TingoBingo" className="w-12 h-12 rounded-2xl shadow-lg" />
+                        <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-md">TingoBingo</h1>
+                    </div>
+
+                    {/* Right Actions */}
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => router.push('/search')}
+                            className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-all active:scale-95"
+                        >
+                            <Search className="w-5 h-5 text-white" />
+                        </button>
+                        <button className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-all active:scale-95 relative">
+                            <Bell className="w-5 h-5 text-white" />
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center shadow-md">3</span>
+                        </button>
+                        <Link href="/profile" className="w-10 h-10 rounded-full bg-white border-2 border-white/50 overflow-hidden shadow-lg block transition-transform active:scale-95">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest"} alt="Profile" className="w-full h-full object-cover" />
+                        </Link>
+                    </div>
                 </div>
-                <Link href="/profile" className="w-9 h-9 rounded-full bg-gray-100 border border-gray-200 overflow-hidden p-0.5 shadow-sm block transition-transform active:scale-95">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest"} alt="Profile" className="w-full h-full rounded-full object-cover" />
-                </Link>
             </header>
 
             {/* Stories Bar */}
