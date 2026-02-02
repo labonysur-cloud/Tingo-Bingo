@@ -187,22 +187,21 @@ export default function EditProfilePage() {
                 }
             }
 
-            // 2. Update Owner Profile in Supabase
-            console.log('💾 Saving profile to Supabase with avatar:', photoURL);
-            const { error: upsertError } = await supabase
+            // 2. Update Owner Profile in Supabase (user already exists)
+            console.log('💾 Updating profile in Supabase with avatar:', photoURL);
+            const { error: updateError } = await supabase
                 .from('users')
-                .upsert({
-                    id: user.id,
-                    // Don't update email - it's already set and has UNIQUE constraint
+                .update({
                     name,
                     username: username || null,
                     bio,
                     location,
                     avatar: photoURL,
                     updated_at: new Date().toISOString()
-                }, { onConflict: 'id' });
+                })
+                .eq('id', user.id);
 
-            if (upsertError) throw upsertError;
+            if (updateError) throw updateError;
             console.log('✅ Profile saved to Supabase successfully!');
 
             // 3. Save Pet Data (Only if name is provided)
