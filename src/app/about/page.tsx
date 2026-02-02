@@ -17,8 +17,9 @@ export default function AboutPage() {
 
             <div className="p-6 max-w-lg mx-auto">
                 <div className="flex flex-col items-center text-center mb-8">
-                    <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-pink-500 rounded-3xl flex items-center justify-center text-white font-black text-3xl shadow-xl mb-6 transform rotate-3">
-                        TB
+                    <div className="w-20 h-20 rounded-3xl overflow-hidden shadow-xl mb-6">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/logo.png" alt="TingoBingo" className="w-full h-full object-contain" />
                     </div>
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">TingoBingo</h1>
                     <p className="text-lg text-gray-500 font-medium">The Super App for Pet Lovers</p>
