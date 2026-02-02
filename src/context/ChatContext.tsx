@@ -140,6 +140,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         fetchMessages();
 
         // Subscribe to NEW messages in this conversation
+        console.log('🔔 Setting up real-time subscription for chat:', activeConversationId);
+
         const channel = supabase
             .channel(`chat:${activeConversationId}`)
             .on('postgres_changes', {
@@ -148,8 +150,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 table: 'messages',
                 filter: `chat_id=eq.${activeConversationId}`
             }, (payload) => {
+                console.log('🔔 Real-time message received:', payload);
                 const newMessage = payload.new as Message;
-                setMessages(prev => [...prev, newMessage]);
+                console.log('Adding message to UI:', newMessage);
+                setMessages(prev => {
+                    console.log('Previous messages:', prev.length);
+                    const updated = [...prev, newMessage];
+                    console.log('Updated messages:', updated.length);
+                    return updated;
+                });
 
                 // Also update conversation last_message
                 setConversations(prev => prev.map(c => {
@@ -159,9 +168,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     return c;
                 }));
             })
-            .subscribe();
+            .subscribe((status, err) => {
+                console.log('🔔 Subscription status:', status);
+                if (err) console.error('🔔 Subscription error:', err);
+            });
 
         return () => {
+            console.log('🔕 Removing subscription for chat:', activeConversationId);
             supabase.removeChannel(channel);
         };
     }, [activeConversationId]);
