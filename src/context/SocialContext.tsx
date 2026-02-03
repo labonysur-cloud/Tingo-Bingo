@@ -223,8 +223,14 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             }));
 
             setPosts(transformedPosts);
-        } catch (error) {
-            console.error("Error fetching posts:", error);
+        } catch (error: any) {
+            console.error("❌ Error fetching posts:", error);
+            console.error("Error details:", {
+                message: error?.message,
+                details: error?.details,
+                hint: error?.hint,
+                code: error?.code
+            });
         }
     };
 

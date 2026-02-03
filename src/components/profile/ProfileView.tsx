@@ -3,7 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { useSocial } from "@/context/SocialContext";
 import CreatePost from "../feed/CreatePost";
-import { Settings, Loader2, Heart, MessageCircle, Send, ArrowRight } from "lucide-react";
+import { Settings, Loader2, Heart, MessageCircle, Send, ArrowRight, Trash2 } from "lucide-react";
 import HighlightsBar from "./HighlightsBar";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -29,7 +29,7 @@ interface ProfileViewProps {
 
 export default function ProfileView({ userId }: ProfileViewProps) {
     const { user: currentUser, logout, isLoading: authLoading } = useAuth();
-    const { addComment, likeComment, likePost, savePost, getComments, posts: allPosts } = useSocial();
+    const { addComment, likeComment, likePost, savePost, deletePost, getComments, posts: allPosts } = useSocial();
     const router = useRouter();
 
     // Determine which user to show
@@ -539,6 +539,20 @@ export default function ProfileView({ userId }: ProfileViewProps) {
                                         onClick={() => savePost(post.id)}
                                         size="md"
                                     />
+                                    {/* Delete Button - Only for Post Owner */}
+                                    {currentUser && post.userId === currentUser.id && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Are you sure you want to delete this post?')) {
+                                                    deletePost(post.id);
+                                                }
+                                            }}
+                                            className="ml-auto flex items-center gap-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                                            title="Delete post"
+                                        >
+                                            <Trash2 className="w-5 h-5" />
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Comments Section */}

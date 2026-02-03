@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSocial } from "@/context/SocialContext";
 import { useChat } from "@/context/ChatContext";
 // import { uploadToCloudinary } from "@/lib/cloudinary";  // No longer needed here
-import { Heart, MessageCircle, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search } from "lucide-react";
+import { Heart, MessageCircle, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search, Trash2 } from "lucide-react";
 import CreatePost from "./CreatePost";
 import AddStoryModal from "../stories/AddStoryModal";
 import StoryViewer from "../stories/StoryViewer";
@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 
 export default function FeedView() {
     const { user } = useAuth();
-    const { posts, addPost, likePost, savePost, addComment, likeComment, stories } = useSocial();
+    const { posts, addPost, likePost, savePost, addComment, likeComment, deletePost, stories } = useSocial();
     const { startConversation } = useChat();
     const router = useRouter();
 
@@ -160,7 +160,7 @@ export default function FeedView() {
 
             {/* Feature Banners */}
             <div className="px-4 grid grid-cols-2 gap-3 mb-6">
-                <Link href="/moods">
+                <Link href="/moodboard">
                     <div className="bg-gradient-to-br from-pink-500 to-rose-400 text-white p-4 rounded-2xl flex flex-col justify-between h-24 shadow-lg hover:transform hover:scale-[1.02] transition-all">
                         <LayoutGrid className="w-6 h-6 text-white mb-auto" />
                         <span className="font-semibold text-sm">Mood Board</span>
@@ -256,6 +256,20 @@ export default function FeedView() {
                                         onClick={() => savePost(post.id)}
                                         size="md"
                                     />
+                                    {/* Delete Button - Only for Post Owner */}
+                                    {user && post.userId === user.id && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm('Are you sure you want to delete this post?')) {
+                                                    deletePost(post.id);
+                                                }
+                                            }}
+                                            className="ml-auto flex items-center gap-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                                            title="Delete post"
+                                        >
+                                            <Trash2 className="w-5 h-5" />
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Comments Section - Toggleable */}

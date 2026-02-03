@@ -73,7 +73,17 @@ export default function ShopView() {
                 .eq('is_active', true)
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Supabase error details:', {
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code
+                });
+                throw error;
+            }
+
+            console.log(`✅ Fetched ${data?.length || 0} products`);
 
             // Calculate ratings (you'd normally get this from reviews)
             const productsWithRatings = (data || []).map(p => ({
@@ -84,8 +94,11 @@ export default function ShopView() {
             }));
 
             setProducts(productsWithRatings as any);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching products:', error);
+            const errorMessage = error?.message || 'Unknown error';
+            console.error('Error message:', errorMessage);
+            // showToast.error(`Failed to load products: ${errorMessage}`);
         } finally {
             setLoading(false);
         }

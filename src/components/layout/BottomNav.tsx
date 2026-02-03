@@ -20,6 +20,7 @@ export default function BottomNav() {
         { label: "Profile", href: "/profile", icon: User },
     ];
 
+
     return (
         <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-gray-50/80 backdrop-blur-xl border-t border-gray-200 h-20 z-50 pb-safe shadow-2xl">
             <div className="flex justify-around items-center h-full max-w-lg mx-auto px-2">
