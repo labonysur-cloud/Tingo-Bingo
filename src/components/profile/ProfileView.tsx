@@ -956,9 +956,9 @@ export default function ProfileView({ userId }: ProfileViewProps) {
                                         {showComments[post.id] && (
                                             <div className="border-t border-gray-100 bg-gray-50 -mx-5 -mb-5 mt-4 animate-in slide-in-from-top-2 duration-300">
                                                 {/* Comments List */}
-                                                {post.comments && post.comments.length > 0 && (
+                                                {post.comments && Array.isArray(post.comments) && post.comments.length > 0 && (
                                                     <div className="px-4 py-4 max-h-96 overflow-y-auto">
-                                                        {post.comments.map((comment: any) => (
+                                                        {post.comments.filter((comment: any) => comment != null).map((comment: any) => (
                                                             <CommentItem
                                                                 key={comment.id}
                                                                 comment={comment}
