@@ -223,6 +223,9 @@ function ChatWindow({ toggleSidebar, isSidebarOpen }: { toggleSidebar: () => voi
     );
 }
 
+// Add this import at the top of the file
+import ReelLinkPreview from "@/components/chat/ReelLinkPreview";
+
 function MessageBubble({ message }: { message: any }) {
     const { user } = useAuth();
     const { activeConversation } = useChat();
@@ -234,6 +237,16 @@ function MessageBubble({ message }: { message: any }) {
     const senderInfo = isMe
         ? { name: user.name, avatar: user.avatar }
         : activeConversation?.participants[0]?.user || { name: 'Unknown', avatar: '' };
+
+    // --- LINK DETECTION LOGIC ---
+    // Regex to find "reels?id=..." pattern
+    const reelLinkRegex = /(?:https?:\/\/[^\/]+\/)?reels\?id=([a-f0-9-]+)/i;
+    const match = message.content?.match(reelLinkRegex);
+    const reelId = match ? match[1] : null;
+
+    // Optional: Clean content by removing the link if it's the only thing (cleaner look)
+    // Or keep it. Let's keep it but maybe highlight it? 
+    // For now, standard rendering.
 
     return (
         <div className={`flex gap-2 ${isMe ? 'justify-end' : 'justify-start'} items-end`}>
@@ -248,7 +261,7 @@ function MessageBubble({ message }: { message: any }) {
                 </div>
             )}
 
-            <div className={`max-w-[70%] rounded-2xl px-4 py-3 ${isMe
+            <div className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-3 ${isMe
                 ? 'bg-purple-600 text-white rounded-br-none'
                 : 'bg-white text-gray-800 border border-gray-100 shadow-sm rounded-bl-none'
                 }`}>
@@ -262,7 +275,21 @@ function MessageBubble({ message }: { message: any }) {
                         />
                     </div>
                 )}
-                {message.content && <p className="text-sm leading-relaxed">{message.content}</p>}
+
+                {/* Content */}
+                {message.content && (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                        {message.content}
+                    </p>
+                )}
+
+                {/* RICH LINK PREVIEW */}
+                {reelId && (
+                    <div className="mt-2 text-left">
+                        <ReelLinkPreview reelId={reelId} />
+                    </div>
+                )}
+
                 <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-purple-200' : 'text-gray-400'}`}>
                     {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>

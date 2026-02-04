@@ -36,7 +36,7 @@ interface ChatContextType {
     messages: Message[];
     isLoading: boolean;
     setActiveConversationId: (id: string | null) => void;
-    sendMessage: (content: string, file?: File | null, mediaType?: 'image' | 'video' | 'gif') => Promise<void>;
+    sendMessage: (content: string, file?: File | null, mediaType?: 'image' | 'video' | 'gif', explicitChatId?: string) => Promise<void>;
     startConversation: (userId: string) => Promise<string>; // Returns conversation ID
     refreshConversations: () => Promise<void>;
     onlineUsers: Set<string>;
@@ -188,14 +188,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }, [user]);
 
     // 3. Send Message
-    const sendMessage = async (content: string, file?: File | null, mediaType?: 'image' | 'video' | 'gif') => {
+    const sendMessage = async (content: string, file?: File | null, mediaType?: 'image' | 'video' | 'gif', explicitChatId?: string) => {
+        const targetChatId = explicitChatId || activeConversationId;
+
         console.log('📤 sendMessage called');
         console.log('User:', user?.id);
-        console.log('Active chat:', activeConversationId);
+        console.log('Target chat:', targetChatId);
         console.log('Content:', content);
-        console.log('File:', file);
 
-        if (!user || !activeConversationId) {
+        if (!user || !targetChatId) {
             console.error('❌ Cannot send - missing user or chat ID');
             return;
         }
@@ -209,7 +210,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             }
 
             const newMessage = {
-                chat_id: activeConversationId,
+                chat_id: targetChatId,
                 sender_id: user.id,
                 content: content || null,
                 media_url: mediaUrl,
