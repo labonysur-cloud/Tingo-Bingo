@@ -5,6 +5,7 @@ import { useSocial } from "@/context/SocialContext";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { Image as ImageIcon, Send, X } from "lucide-react";
 import { useRef, useState } from "react";
+import imageCompression from 'browser-image-compression';
 
 interface CreatePostProps {
     petId?: string;
@@ -46,7 +47,18 @@ export default function CreatePost({ petId }: CreatePostProps) {
             // 1. Upload Image if selected
             if (selectedFile && user) {
                 try {
-                    imageUrl = await uploadToCloudinary(selectedFile);
+                    console.log(`Original file size: ${selectedFile.size / 1024 / 1024} MB`);
+
+                    const options = {
+                        maxSizeMB: 1, // Max 1MB
+                        maxWidthOrHeight: 1920, // Max width/height
+                        useWebWorker: true,
+                    };
+
+                    const compressedFile = await imageCompression(selectedFile, options);
+                    console.log(`Compressed file size: ${compressedFile.size / 1024 / 1024} MB`);
+
+                    imageUrl = await uploadToCloudinary(compressedFile);
                 } catch (err: any) {
                     console.error("Image upload failed:", err);
                     alert(`Image upload failed: ${err.message || "Unknown error"}. Check your network tab for details.`);
