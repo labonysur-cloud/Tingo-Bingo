@@ -47,9 +47,9 @@ export default function CreatePost({ petId }: CreatePostProps) {
             if (selectedFile && user) {
                 try {
                     imageUrl = await uploadToCloudinary(selectedFile);
-                } catch (err) {
+                } catch (err: any) {
                     console.error("Image upload failed:", err);
-                    alert("Image failed to upload. Posting text only.");
+                    alert(`Image upload failed: ${err.message || "Unknown error"}. Check your network tab for details.`);
                 }
             }
 
