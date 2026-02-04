@@ -3,7 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { useSocial } from "@/context/SocialContext";
 import CreatePost from "../feed/CreatePost";
-import { Settings, Loader2, Heart, MessageCircle, Send, ArrowRight, Trash2 } from "lucide-react";
+import { Settings, Loader2, Heart, MessageCircle, Send, ArrowRight, Trash2, Play, Pause, Bookmark } from "lucide-react";
 import HighlightsBar from "./HighlightsBar";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -13,6 +13,8 @@ import FollowListModal from "./FollowListModal";
 import CommentItem from "../feed/CommentItem";
 import LikeButton from "../ui/LikeButton";
 import SaveButton from "../ui/SaveButton";
+import { useRef } from "react";
+import toast from "react-hot-toast";
 
 interface Post {
     id: string;
@@ -25,6 +27,325 @@ interface Post {
 
 interface ProfileViewProps {
     userId?: string; // If undefined, show current user
+}
+
+// Profile Reel Item Component with Interactions
+function ProfileReelItem({ reel, currentUser, isOwner, onDelete }: {
+    reel: any;
+    currentUser: any;
+    isOwner: boolean;
+    onDelete: (id: string) => void;
+}) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [isLiked, setIsLiked] = useState(false);
+    const [likesCount, setLikesCount] = useState(0);
+    const [isSaved, setIsSaved] = useState(false);
+    const [showComments, setShowComments] = useState(false);
+    const [comments, setComments] = useState<any[]>([]);
+    const [commentText, setCommentText] = useState('');
+    const router = useRouter();
+
+    // Fetch like status and count
+    useEffect(() => {
+        const fetchLikeData = async () => {
+            if (!reel.id) return;
+
+            // Get likes count
+            const { count } = await supabase
+                .from('reel_likes')
+                .select('*', { count: 'exact', head: true })
+                .eq('reel_id', reel.id);
+
+            setLikesCount(count || 0);
+
+            // Check if current user liked
+            if (currentUser) {
+                const { data } = await supabase
+                    .from('reel_likes')
+                    .select('*')
+                    .eq('reel_id', reel.id)
+                    .eq('user_id', currentUser.id)
+                    .maybeSingle();
+
+                setIsLiked(!!data);
+            }
+        };
+
+        fetchLikeData();
+    }, [reel.id, currentUser]);
+
+    // Fetch save status
+    useEffect(() => {
+        const fetchSaveStatus = async () => {
+            if (!currentUser || !reel.id) return;
+
+            const { data } = await supabase
+                .from('saved_reels')
+                .select('*')
+                .eq('reel_id', reel.id)
+                .eq('user_id', currentUser.id)
+                .maybeSingle();
+
+            setIsSaved(!!data);
+        };
+
+        fetchSaveStatus();
+    }, [reel.id, currentUser]);
+
+    // Fetch comments
+    useEffect(() => {
+        const fetchComments = async () => {
+            if (!reel.id || !showComments) return;
+
+            const { data } = await supabase
+                .from('reel_comments')
+                .select(`
+                    *,
+                    user:users(id, name, avatar)
+                `)
+                .eq('reel_id', reel.id)
+                .order('created_at', { ascending: true });
+
+            setComments(data || []);
+        };
+
+        fetchComments();
+    }, [reel.id, showComments]);
+
+    const togglePlay = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!videoRef.current) return;
+
+        if (isPlaying) {
+            videoRef.current.pause();
+            setIsPlaying(false);
+        } else {
+            videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        }
+    };
+
+    const handleLike = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!currentUser) return;
+
+        try {
+            if (isLiked) {
+                await supabase
+                    .from('reel_likes')
+                    .delete()
+                    .eq('reel_id', reel.id)
+                    .eq('user_id', currentUser.id);
+                setIsLiked(false);
+                setLikesCount(prev => Math.max(0, prev - 1));
+            } else {
+                await supabase
+                    .from('reel_likes')
+                    .insert({ reel_id: reel.id, user_id: currentUser.id });
+                setIsLiked(true);
+                setLikesCount(prev => prev + 1);
+            }
+        } catch (error) {
+            console.error('Error toggling like:', error);
+        }
+    };
+
+    const handleSave = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!currentUser) return;
+
+        try {
+            if (isSaved) {
+                await supabase
+                    .from('saved_reels')
+                    .delete()
+                    .eq('reel_id', reel.id)
+                    .eq('user_id', currentUser.id);
+                setIsSaved(false);
+                toast.success('Removed from saved');
+            } else {
+                await supabase
+                    .from('saved_reels')
+                    .insert({ reel_id: reel.id, user_id: currentUser.id });
+                setIsSaved(true);
+                toast.success('Saved to Moodboard!');
+            }
+        } catch (error) {
+            console.error('Error toggling save:', error);
+        }
+    };
+
+    const handleAddComment = async () => {
+        if (!currentUser || !commentText.trim()) return;
+
+        try {
+            const { error } = await supabase
+                .from('reel_comments')
+                .insert({
+                    reel_id: reel.id,
+                    user_id: currentUser.id,
+                    content: commentText.trim()
+                });
+
+            if (error) throw error;
+
+            setCommentText('');
+            // Refresh comments
+            const { data } = await supabase
+                .from('reel_comments')
+                .select(`
+                    *,
+                    user:users(id, name, avatar)
+                `)
+                .eq('reel_id', reel.id)
+                .order('created_at', { ascending: true });
+
+            setComments(data || []);
+            toast.success('Comment added!');
+        } catch (error) {
+            console.error('Error adding comment:', error);
+            toast.error('Failed to add comment');
+        }
+    };
+
+    return (
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Video Container */}
+            <div
+                className="relative w-full bg-black cursor-pointer group"
+                onClick={() => router.push(`/reels?id=${reel.id}`)}
+            >
+                <video
+                    ref={videoRef}
+                    src={reel.video_url}
+                    poster={reel.thumbnail_url}
+                    className="w-full h-auto block object-contain max-h-[600px] bg-gray-900"
+                    loop
+                    muted
+                    playsInline
+                />
+
+                {/* Play/Pause Overlay */}
+                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                    <div
+                        onClick={togglePlay}
+                        className={`w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm border border-white/40 flex items-center justify-center cursor-pointer pointer-events-auto transition-all duration-300 transform hover:scale-110 ${isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
+                            }`}
+                    >
+                        {isPlaying ? <Pause className="w-6 h-6 text-white fill-white" /> : <Play className="w-6 h-6 text-white fill-white ml-1" />}
+                    </div>
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-5">
+                {reel.caption && (
+                    <p className="text-gray-900 mb-4 leading-relaxed whitespace-pre-wrap">{reel.caption}</p>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-6 mb-2">
+                    <button
+                        onClick={handleLike}
+                        className={`flex items-center gap-1.5 transition-colors ${isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
+                            }`}
+                    >
+                        <Heart className={`w-6 h-6 ${isLiked ? 'fill-current' : ''}`} />
+                        <span className="font-bold text-sm">{likesCount}</span>
+                    </button>
+
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowComments(!showComments);
+                        }}
+                        className="flex items-center gap-1.5 text-gray-500 hover:text-blue-500 transition-colors"
+                    >
+                        <MessageCircle className="w-6 h-6" />
+                        <span className="font-bold text-sm">{comments.length}</span>
+                    </button>
+
+                    <button
+                        onClick={handleSave}
+                        className={`flex items-center gap-1.5 transition-colors ${isSaved ? 'text-yellow-500' : 'text-gray-500 hover:text-yellow-500'
+                            }`}
+                    >
+                        <Bookmark className={`w-6 h-6 ${isSaved ? 'fill-current' : ''}`} />
+                    </button>
+
+                    {isOwner && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(reel.id);
+                            }}
+                            className="ml-auto flex items-center gap-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                            title="Delete Tangii"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Comments Section */}
+                {showComments && (
+                    <div className="border-t border-gray-100 bg-gray-50 -mx-5 -mb-5 mt-4 animate-in slide-in-from-top-2 duration-300">
+                        {/* Comments List */}
+                        {comments.length > 0 && (
+                            <div className="px-4 py-4 max-h-96 overflow-y-auto space-y-3">
+                                {comments.map((comment) => (
+                                    <div key={comment.id} className="flex gap-2">
+                                        <img
+                                            src={comment.user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest"}
+                                            alt={comment.user?.name}
+                                            className="w-8 h-8 rounded-full flex-shrink-0"
+                                        />
+                                        <div className="flex-1">
+                                            <div className="bg-white rounded-2xl px-3 py-2">
+                                                <p className="font-bold text-sm text-gray-900">{comment.user?.name}</p>
+                                                <p className="text-sm text-gray-700">{comment.content}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Comment Input */}
+                        <div className="px-4 py-3 border-t border-gray-100">
+                            <div className="flex gap-2">
+                                <img
+                                    src={currentUser?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest"}
+                                    alt="Your avatar"
+                                    className="w-8 h-8 rounded-full flex-shrink-0"
+                                />
+                                <div className="flex-1 flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Add a comment..."
+                                        value={commentText}
+                                        onChange={(e) => setCommentText(e.target.value)}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') handleAddComment();
+                                        }}
+                                        className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                    <button
+                                        onClick={handleAddComment}
+                                        disabled={!commentText.trim()}
+                                        className="bg-primary text-white p-2 rounded-full hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        <Send className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 }
 
 export default function ProfileView({ userId }: ProfileViewProps) {
@@ -45,6 +366,9 @@ export default function ProfileView({ userId }: ProfileViewProps) {
     const [showComments, setShowComments] = useState<{ [key: string]: boolean }>({});
     const [commentText, setCommentText] = useState<{ [key: string]: string | undefined }>({});
     const [refreshTrigger, setRefreshTrigger] = useState(0); // Add refresh trigger
+    const [userReels, setUserReels] = useState<any[]>([]);
+    const [loadingReels, setLoadingReels] = useState(true);
+    const [activeTab, setActiveTab] = useState<'posts' | 'tangii'>('posts');
 
     // Follow System State
     const [followersCount, setFollowersCount] = useState(0);
@@ -159,6 +483,52 @@ export default function ProfileView({ userId }: ProfileViewProps) {
         }
     }, [allPosts]);
 
+    // Fetch User Reels
+    useEffect(() => {
+        if (!targetUserId) return;
+
+        const fetchUserReels = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('reels')
+                    .select(`
+                        *,
+                        user:users(id, name, avatar)
+                    `)
+                    .eq('user_id', targetUserId)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                setUserReels(data || []);
+            } catch (error) {
+                console.error('Error fetching user reels:', error);
+            } finally {
+                setLoadingReels(false);
+            }
+        };
+
+        fetchUserReels();
+    }, [targetUserId]);
+
+
+    const handleDeleteReel = async (reelId: string) => {
+        if (!confirm('Are you sure you want to delete this Tangii?')) return;
+
+        try {
+            const { error } = await supabase
+                .from('reels')
+                .delete()
+                .eq('id', reelId);
+
+            if (error) throw error;
+
+            setUserReels(prev => prev.filter(r => r.id !== reelId));
+            toast.success('Tangii deleted successfully!');
+        } catch (error) {
+            console.error('Error deleting reel:', error);
+            toast.error('Failed to delete Tangii');
+        }
+    };
 
     const handleFollow = async () => {
         if (!currentUser || !targetUserId || followLoading) return;
@@ -481,158 +851,210 @@ export default function ProfileView({ userId }: ProfileViewProps) {
             )}
 
             {/* Posts Feed for User */}
-            <div className="flex items-center justify-between mb-4 px-2 mt-8">
-                <h2 className="text-lg font-bold text-gray-900">Latest Posts</h2>
-            </div>
+            <div className="px-6">
+                {/* Tab Selector */}
+                <div className="flex items-center gap-4 mb-6 border-b border-gray-200">
+                    <button
+                        onClick={() => setActiveTab('posts')}
+                        className={`pb-3 px-4 font-bold text-sm transition-all relative ${activeTab === 'posts'
+                            ? 'text-purple-600'
+                            : 'text-gray-400 hover:text-gray-600'
+                            }`}
+                    >
+                        Posts
+                        {activeTab === 'posts' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('tangii')}
+                        className={`pb-3 px-4 font-bold text-sm transition-all relative ${activeTab === 'tangii'
+                            ? 'text-orange-600'
+                            : 'text-gray-400 hover:text-gray-600'
+                            }`}
+                    >
+                        Tangii
+                        {activeTab === 'tangii' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-600" />
+                        )}
+                    </button>
+                </div>
 
-            <div className="flex flex-col gap-6">
-                {/* Create Post Widget (Only for me) */}
-                {isMe && (
-                    <div className="mb-2">
-                        <CreatePost />
+                {/* Posts Tab Content */}
+                {activeTab === 'posts' && (
+                    <div className="flex flex-col gap-6">
+                        {/* Create Post Widget (Only for me) */}
+                        {isMe && (
+                            <div className="mb-2">
+                                <CreatePost />
+                            </div>
+                        )}
+
+                        {loadingPosts ? (
+                            <div className="p-12 text-center text-gray-400">Loading posts...</div>
+                        ) : allPosts.filter(p => p.userId === targetUserId).length === 0 ? (
+                            <div className="text-center text-gray-400 py-12 bg-white rounded-3xl border border-gray-100">
+                                No posts yet.
+                            </div>
+                        ) : (
+                            allPosts.filter(p => p.userId === targetUserId).map((post) => (
+                                <div key={post.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                                    {/* Post Image */}
+                                    {post.image && (
+                                        <div className="relative w-full bg-gray-100">
+                                            <img src={post.image} alt="Post" className="w-full object-contain max-h-[500px]" />
+                                        </div>
+                                    )}
+
+                                    {/* Post Content */}
+                                    <div className="p-5">
+                                        {post.caption && (
+                                            <p className="text-gray-900 mb-4 leading-relaxed whitespace-pre-wrap">{post.caption}</p>
+                                        )}
+
+                                        {/* Action Buttons */}
+                                        <div className="flex items-center gap-6 mb-2">
+                                            <LikeButton
+                                                isLiked={post.isLikedByMe || false}
+                                                likesCount={post.likesCount || 0}
+                                                onClick={() => likePost(post.id)}
+                                                size="md"
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    const newShowComments = { ...showComments };
+                                                    newShowComments[post.id] = !newShowComments[post.id];
+                                                    setShowComments(newShowComments);
+                                                }}
+                                                className="flex items-center gap-1.5 text-gray-500 hover:text-blue-500 transition-colors"
+                                            >
+                                                <MessageCircle className="w-6 h-6" />
+                                                <span className="font-bold text-sm">{post.commentsCount || 0}</span>
+                                            </button>
+                                            <SaveButton
+                                                isSaved={post.isSavedByMe || false}
+                                                onClick={() => savePost(post.id)}
+                                                size="md"
+                                            />
+                                            {/* Delete Button - Only for Post Owner */}
+                                            {currentUser && post.userId === currentUser.id && (
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm('Are you sure you want to delete this post?')) {
+                                                            deletePost(post.id);
+                                                        }
+                                                    }}
+                                                    className="ml-auto flex items-center gap-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                                                    title="Delete post"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Comments Section */}
+                                        {showComments[post.id] && (
+                                            <div className="border-t border-gray-100 bg-gray-50 -mx-5 -mb-5 mt-4 animate-in slide-in-from-top-2 duration-300">
+                                                {/* Comments List */}
+                                                {post.comments && post.comments.length > 0 && (
+                                                    <div className="px-4 py-4 max-h-96 overflow-y-auto">
+                                                        {post.comments.map((comment: any) => (
+                                                            <CommentItem
+                                                                key={comment.id}
+                                                                comment={comment}
+                                                                postId={post.id}
+                                                                onReply={(commentId, parentName) => {
+                                                                    setCommentText({
+                                                                        ...commentText,
+                                                                        [post.id]: `@${parentName} `,
+                                                                        [`${post.id}_replyTo`]: commentId
+                                                                    });
+                                                                }}
+                                                                onLike={(commentId, postId) => {
+                                                                    likeComment(commentId, postId);
+                                                                }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* Comment Input */}
+                                                <div className="px-4 py-3 border-t border-gray-100">
+                                                    <div className="flex gap-2">
+                                                        <img
+                                                            src={currentUser?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest"}
+                                                            alt="Your avatar"
+                                                            className="w-8 h-8 rounded-full flex-shrink-0"
+                                                        />
+                                                        <div className="flex-1 flex gap-2">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Add a comment..."
+                                                                value={commentText[post.id] || ""}
+                                                                onChange={(e) => setCommentText({ ...commentText, [post.id]: e.target.value })}
+                                                                onKeyPress={(e) => {
+                                                                    if (e.key === 'Enter' && commentText[post.id]?.trim()) {
+                                                                        const replyToId = commentText[`${post.id}_replyTo`] as string | undefined;
+                                                                        addComment(post.id, commentText[post.id] ?? "", replyToId);
+                                                                        setCommentText({
+                                                                            ...commentText,
+                                                                            [post.id]: "",
+                                                                            [`${post.id}_replyTo`]: undefined
+                                                                        });
+                                                                    }
+                                                                }}
+                                                                className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                            />
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (commentText[post.id]?.trim()) {
+                                                                        const replyToId = commentText[`${post.id}_replyTo`] as string | undefined;
+                                                                        addComment(post.id, commentText[post.id] ?? "", replyToId);
+                                                                        setCommentText({
+                                                                            ...commentText,
+                                                                            [post.id]: "",
+                                                                            [`${post.id}_replyTo`]: undefined
+                                                                        });
+                                                                    }
+                                                                }}
+                                                                disabled={!commentText[post.id]?.trim()}
+                                                                className="bg-primary text-white p-2 rounded-full hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                            >
+                                                                <Send className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 )}
 
-                {loadingPosts ? (
-                    <div className="p-12 text-center text-gray-400">Loading posts...</div>
-                ) : allPosts.filter(p => p.userId === targetUserId).length === 0 ? (
-                    <div className="text-center text-gray-400 py-12 bg-white rounded-3xl border border-gray-100">
-                        No posts yet.
-                    </div>
-                ) : (
-                    allPosts.filter(p => p.userId === targetUserId).map((post) => (
-                        <div key={post.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                            {/* Post Image */}
-                            {post.image && (
-                                <div className="relative w-full bg-gray-100">
-                                    <img src={post.image} alt="Post" className="w-full object-contain max-h-[500px]" />
-                                </div>
-                            )}
-
-                            {/* Post Content */}
-                            <div className="p-5">
-                                {post.caption && (
-                                    <p className="text-gray-900 mb-4 leading-relaxed whitespace-pre-wrap">{post.caption}</p>
-                                )}
-
-                                {/* Action Buttons */}
-                                <div className="flex items-center gap-6 mb-2">
-                                    <LikeButton
-                                        isLiked={post.isLikedByMe || false}
-                                        likesCount={post.likesCount || 0}
-                                        onClick={() => likePost(post.id)}
-                                        size="md"
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            const newShowComments = { ...showComments };
-                                            newShowComments[post.id] = !newShowComments[post.id];
-                                            setShowComments(newShowComments);
-                                        }}
-                                        className="flex items-center gap-1.5 text-gray-500 hover:text-blue-500 transition-colors"
-                                    >
-                                        <MessageCircle className="w-6 h-6" />
-                                        <span className="font-bold text-sm">{post.commentsCount || 0}</span>
-                                    </button>
-                                    <SaveButton
-                                        isSaved={post.isSavedByMe || false}
-                                        onClick={() => savePost(post.id)}
-                                        size="md"
-                                    />
-                                    {/* Delete Button - Only for Post Owner */}
-                                    {currentUser && post.userId === currentUser.id && (
-                                        <button
-                                            onClick={() => {
-                                                if (confirm('Are you sure you want to delete this post?')) {
-                                                    deletePost(post.id);
-                                                }
-                                            }}
-                                            className="ml-auto flex items-center gap-1.5 text-gray-400 hover:text-red-500 transition-colors"
-                                            title="Delete post"
-                                        >
-                                            <Trash2 className="w-5 h-5" />
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Comments Section */}
-                                {showComments[post.id] && (
-                                    <div className="border-t border-gray-100 bg-gray-50 -mx-5 -mb-5 mt-4 animate-in slide-in-from-top-2 duration-300">
-                                        {/* Comments List */}
-                                        {post.comments && post.comments.length > 0 && (
-                                            <div className="px-4 py-4 max-h-96 overflow-y-auto">
-                                                {post.comments.map((comment) => (
-                                                    <CommentItem
-                                                        key={comment.id}
-                                                        comment={comment}
-                                                        postId={post.id}
-                                                        onReply={(commentId, parentName) => {
-                                                            setCommentText({
-                                                                ...commentText,
-                                                                [post.id]: `@${parentName} `,
-                                                                [`${post.id}_replyTo`]: commentId
-                                                            });
-                                                        }}
-                                                        onLike={(commentId, postId) => {
-                                                            likeComment(commentId, postId);
-                                                        }}
-                                                    />
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {/* Comment Input */}
-                                        <div className="px-4 py-3 border-t border-gray-100">
-                                            <div className="flex gap-2">
-                                                <img
-                                                    src={currentUser?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest"}
-                                                    alt="Your avatar"
-                                                    className="w-8 h-8 rounded-full flex-shrink-0"
-                                                />
-                                                <div className="flex-1 flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Add a comment..."
-                                                        value={commentText[post.id] || ""}
-                                                        onChange={(e) => setCommentText({ ...commentText, [post.id]: e.target.value })}
-                                                        onKeyPress={(e) => {
-                                                            if (e.key === 'Enter' && commentText[post.id]?.trim()) {
-                                                                const replyToId = commentText[`${post.id}_replyTo`] as string | undefined;
-                                                                addComment(post.id, commentText[post.id] ?? "", replyToId);
-                                                                setCommentText({
-                                                                    ...commentText,
-                                                                    [post.id]: "",
-                                                                    [`${post.id}_replyTo`]: undefined
-                                                                });
-                                                            }
-                                                        }}
-                                                        className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                                    />
-                                                    <button
-                                                        onClick={() => {
-                                                            if (commentText[post.id]?.trim()) {
-                                                                const replyToId = commentText[`${post.id}_replyTo`] as string | undefined;
-                                                                addComment(post.id, commentText[post.id] ?? "", replyToId);
-                                                                setCommentText({
-                                                                    ...commentText,
-                                                                    [post.id]: "",
-                                                                    [`${post.id}_replyTo`]: undefined
-                                                                });
-                                                            }
-                                                        }}
-                                                        disabled={!commentText[post.id]?.trim()}
-                                                        className="bg-primary text-white p-2 rounded-full hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                                    >
-                                                        <Send className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                {/* Tangii Tab Content */}
+                {activeTab === 'tangii' && (
+                    <div className="flex flex-col gap-6">
+                        {loadingReels ? (
+                            <div className="p-12 text-center text-gray-400">Loading Tangii...</div>
+                        ) : userReels.length === 0 ? (
+                            <div className="text-center text-gray-400 py-12 bg-white rounded-3xl border border-gray-100">
+                                No Tangii yet.
                             </div>
-                        </div>
-                    ))
+                        ) : (
+                            userReels.map((reel) => (
+                                <ProfileReelItem
+                                    key={reel.id}
+                                    reel={reel}
+                                    currentUser={currentUser}
+                                    isOwner={reel.user_id === currentUser?.id}
+                                    onDelete={handleDeleteReel}
+                                />
+                            ))
+                        )}
+                    </div>
                 )}
             </div>
         </div>
