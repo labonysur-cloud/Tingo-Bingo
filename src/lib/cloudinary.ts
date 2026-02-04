@@ -25,8 +25,15 @@ export async function uploadToCloudinary(file: File): Promise<string> {
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Upload failed');
+            let errorMessage = 'Upload failed';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorData.message || 'Upload failed';
+            } catch (e) {
+                // If response is not JSON (e.g. 413 Payload Too Large HTML from Vercel)
+                errorMessage = `Upload failed (${response.status} ${response.statusText})`;
+            }
+            throw new Error(errorMessage);
         }
 
         const data = await response.json();
