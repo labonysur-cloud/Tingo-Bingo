@@ -73,9 +73,9 @@ export default function NotificationBell() {
             {/* Bell Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors relative"
+                className="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-dark-surface-secondary flex items-center justify-center transition-colors relative"
             >
-                <Bell className="w-5 h-5 text-gray-600" />
+                <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                 {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center">
                         {unreadCount > 99 ? '99+' : unreadCount}
@@ -85,14 +85,14 @@ export default function NotificationBell() {
 
             {/* Dropdown */}
             {isOpen && (
-                <div className="absolute right-0 top-14 w-96 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 top-14 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-dark-surface rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden z-50 animate-in slide-in-from-top-2 duration-200 transition-colors">
                     {/* Header */}
-                    <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-orange-50 to-pink-50">
-                        <h3 className="font-bold text-lg text-gray-900">Notifications</h3>
+                    <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gradient-to-r from-orange-50 dark:from-orange-950 to-pink-50 dark:to-pink-950 transition-colors">
+                        <h3 className="font-bold text-lg text-gray-900 dark:text-white">Notifications</h3>
                         {unreadCount > 0 && (
                             <button
                                 onClick={markAllAsRead}
-                                className="text-sm text-primary hover:text-primary/80 font-semibold transition-colors"
+                                className="text-sm text-primary hover:text-primary/80 dark:text-primary dark:hover:text-primary/70 font-semibold transition-colors"
                             >
                                 Mark all read
                             </button>
@@ -102,7 +102,7 @@ export default function NotificationBell() {
                     {/* Notification List */}
                     <div className="max-h-[500px] overflow-y-auto">
                         {notifications.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400">
+                            <div className="p-8 text-center text-gray-400 dark:text-gray-500">
                                 <Bell className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p className="text-sm">No notifications yet</p>
                             </div>
@@ -111,7 +111,7 @@ export default function NotificationBell() {
                                 <div
                                     key={notification.id}
                                     onClick={() => handleNotificationClick(notification)}
-                                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3 ${!notification.read ? 'bg-blue-50/50' : ''
+                                    className={`p-4 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-dark-surface-secondary cursor-pointer transition-colors flex gap-3 ${!notification.read ? 'bg-blue-50/50 dark:bg-blue-950/30' : ''
                                         }`}
                                 >
                                     {/* Unread Indicator */}
@@ -130,11 +130,11 @@ export default function NotificationBell() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start gap-2">
                                             <div className="flex-1">
-                                                <p className={`text-sm ${!notification.read ? 'font-bold text-gray-900' : 'text-gray-700'
+                                                <p className={`text-sm ${!notification.read ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'
                                                     }`}>
                                                     {notification.message}
                                                 </p>
-                                                <p className="text-xs text-gray-400 mt-1">
+                                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                                     {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
                                                 </p>
                                             </div>

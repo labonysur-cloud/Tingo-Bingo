@@ -4,7 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useSocial } from "@/context/SocialContext";
 import { useChat } from "@/context/ChatContext";
 // import { uploadToCloudinary } from "@/lib/cloudinary";  // No longer needed here
-import { Heart, MessageCircle, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search, Trash2, RefreshCw } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import CreatePost from "./CreatePost";
 import AddStoryModal from "../stories/AddStoryModal";
 import StoryViewer from "../stories/StoryViewer";
@@ -18,7 +19,7 @@ import { useRouter } from "next/navigation";
 
 export default function FeedView() {
     const { user } = useAuth();
-    const { posts, addPost, likePost, savePost, addComment, likeComment, deletePost, stories } = useSocial();
+    const { posts, addPost, likePost, savePost, addComment, likeComment, deletePost, stories, refreshFeed } = useSocial();
     const { startConversation } = useChat();
     const router = useRouter();
 
@@ -26,6 +27,13 @@ export default function FeedView() {
     const [commentText, setCommentText] = useState<{ [key: string]: string | undefined }>({});
     const [isAddingStory, setIsAddingStory] = useState(false);
     const [viewingStories, setViewingStories] = useState<string | null>(null); // userId of stories being viewed
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await refreshFeed();
+        setTimeout(() => setIsRefreshing(false), 500);
+    };
 
     // Group stories by user
     const storiesByUser = (stories || []).reduce((acc, story) => {
@@ -75,6 +83,15 @@ export default function FeedView() {
 
                         {/* Notification Bell */}
                         <NotificationBell />
+
+                        {/* Refresh Button */}
+                        <button
+                            onClick={handleRefresh}
+                            className={`w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
+                            title="Refresh Feed"
+                        >
+                            <RefreshCw className="w-5 h-5 text-gray-600" />
+                        </button>
 
                         <Link href="/profile" className="w-10 h-10 rounded-full border border-gray-200 overflow-hidden block hover:opacity-80 transition-opacity">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -204,7 +221,9 @@ export default function FeedView() {
                                             <Link href={`/profile/${post.userId}`}>
                                                 <h3 className="font-bold text-sm text-gray-900 cursor-pointer hover:underline">{post.userName}</h3>
                                             </Link>
-                                            <p className="text-xs text-gray-400">Just now</p>
+                                            <p className="text-xs text-gray-400">
+                                                {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+                                            </p>
                                         </div>
                                     </div>
 

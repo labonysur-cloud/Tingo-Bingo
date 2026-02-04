@@ -113,7 +113,7 @@ export default function StoryViewer({ stories, onClose, highlightId }: StoryView
                             {activeStory.userName}
                         </span>
                         <span className="text-gray-300 text-xs shadow-black drop-shadow-md mt-0.5">
-                            {new Date(activeStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {activeStory.createdAt ? new Date(activeStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
                     </div>
                 </Link>

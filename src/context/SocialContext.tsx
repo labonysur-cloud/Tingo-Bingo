@@ -60,6 +60,7 @@ export interface Highlight {
 
 interface SocialContextType {
     posts: Post[];
+    refreshFeed: () => Promise<void>;
     addPost: (caption: string, image?: string, petId?: string) => Promise<void>;
     likePost: (postId: string) => Promise<void>;
     savePost: (postId: string) => Promise<void>;
@@ -512,6 +513,13 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
             showToast.success('Post created successfully!');
             console.log("✅ Post created:", data);
+
+            // Optimistic Update / Immediate Fetch
+            // We don't just wait for realtime headers, we manual fetch to be sure
+            if (data) {
+                // Transform data to Post type if possible, or just fetch
+                fetchPosts();
+            }
         } catch (error: any) {
             console.error("❌ Error creating post:", error);
             showToast.error(error.message || 'Failed to create post');
@@ -1059,6 +1067,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     return (
         <SocialContext.Provider value={{
             posts,
+            refreshFeed: fetchPosts,
             addPost,
             likePost,
             savePost,
