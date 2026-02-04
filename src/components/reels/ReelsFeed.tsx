@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { Heart, MessageCircle, Share2, MoreVertical, Trash2, Bookmark, Eye } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import ReelComments from './ReelComments';
 import toast from 'react-hot-toast';
 
@@ -193,17 +194,20 @@ export default function ReelsFeed() {
     );
 }
 
-function ReelItem({ reel, onOpenComments, onUpdate, onDelete, setActiveShareReel }: {
+function ReelItem({ reel, onUpdate, onDelete, onOpenComments, setActiveShareReel }: {
     reel: Reel;
-    onOpenComments: () => void;
-    onUpdate: (reel: Reel) => void;
+    onUpdate: (updated: Reel) => void;
     onDelete: (id: string) => void;
+    onOpenComments: () => void;
     setActiveShareReel: (reel: Reel) => void;
 }) {
     const { user } = useAuth();
+    const router = useRouter();
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [viewRecorded, setViewRecorded] = useState(false);
+    const [isFollowing, setIsFollowing] = useState(false);
+    const [followLoading, setFollowLoading] = useState(false);
 
     // Like Handler
     const handleLike = async () => {
@@ -264,6 +268,54 @@ function ReelItem({ reel, onOpenComments, onUpdate, onDelete, setActiveShareReel
             toast.success("Reel deleted");
         } catch (e) {
             toast.error("Failed to delete");
+        }
+    };
+
+    // Check Follow Status
+    useEffect(() => {
+        const checkFollowStatus = async () => {
+            if (!user || user.id === reel.user_id) return;
+
+            const { data } = await supabase
+                .from('follows')
+                .select('*')
+                .eq('follower_id', user.id)
+                .eq('following_id', reel.user_id)
+                .maybeSingle();
+
+            setIsFollowing(!!data);
+        };
+
+        checkFollowStatus();
+    }, [user, reel.user_id]);
+
+    // Follow/Unfollow Handler
+    const handleFollow = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!user || followLoading) return;
+
+        setFollowLoading(true);
+        try {
+            if (isFollowing) {
+                await supabase
+                    .from('follows')
+                    .delete()
+                    .eq('follower_id', user.id)
+                    .eq('following_id', reel.user_id);
+                setIsFollowing(false);
+                toast.success('Unfollowed');
+            } else {
+                await supabase
+                    .from('follows')
+                    .insert({ follower_id: user.id, following_id: reel.user_id });
+                setIsFollowing(true);
+                toast.success('Following!');
+            }
+        } catch (error) {
+            console.error('Follow error:', error);
+            toast.error('Failed to update follow status');
+        } finally {
+            setFollowLoading(false);
         }
     };
 
@@ -398,21 +450,41 @@ function ReelItem({ reel, onOpenComments, onUpdate, onDelete, setActiveShareReel
             {/* Bottom Left Info */}
             <div className="absolute bottom-6 left-4 right-20 z-20 pointer-events-auto">
                 <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full border-2 border-orange-500 p-0.5 overflow-hidden">
+                    <Link
+                        href={`/user/${reel.user_id}`}
+                        className="w-10 h-10 rounded-full border-2 border-orange-500 p-0.5 overflow-hidden hover:border-orange-400 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <img
                             src={reel.user?.avatar_url || "/default-avatar.png"}
                             alt={reel.user?.username}
                             className="w-full h-full rounded-full object-cover"
                         />
-                    </div>
+                    </Link>
                     <div className="flex flex-col">
-                        <span className="font-bold text-white text-base shadow-sm drop-shadow-md hover:underline cursor-pointer">
+                        <Link
+                            href={`/user/${reel.user_id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-bold text-white text-base shadow-sm drop-shadow-md hover:underline cursor-pointer"
+                        >
                             @{reel.user?.username || "Unknown"}
-                        </span>
-                        {/* Optional Music/Tag Line if we had it */}
-                        <span className="text-xs text-white/70 flex items-center gap-1">
-                            Original Audio • <span className="text-orange-400">Follow</span>
-                        </span>
+                        </Link>
+                        {/* Follow Button */}
+                        <div className="text-xs text-white/70 flex items-center gap-1">
+                            Original Audio •
+                            {user && user.id !== reel.user_id && (
+                                <button
+                                    onClick={handleFollow}
+                                    disabled={followLoading}
+                                    className={`font-bold transition-colors ${isFollowing
+                                            ? 'text-gray-300 hover:text-white'
+                                            : 'text-orange-400 hover:text-orange-300'
+                                        } disabled:opacity-50`}
+                                >
+                                    {followLoading ? '...' : isFollowing ? 'Following' : 'Follow'}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
