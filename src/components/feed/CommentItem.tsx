@@ -15,7 +15,7 @@ interface CommentItemProps {
 
 export default function CommentItem({ comment, postId, onReply, onLike, depth = 0 }: CommentItemProps) {
     const [showReplies, setShowReplies] = useState(false); // Default to collapsed
-    const hasReplies = comment.replies && comment.replies.length > 0;
+    const hasReplies = comment.replies && Array.isArray(comment.replies) && comment.replies.length > 0;
 
     return (
         <div className={`flex gap-2 ${depth > 0 ? 'ml-8 mt-2' : 'mt-3'}`}>
@@ -95,7 +95,7 @@ export default function CommentItem({ comment, postId, onReply, onLike, depth = 
                 {/* Nested Replies */}
                 {hasReplies && showReplies && (
                     <div className="mt-2 border-l-2 border-gray-200 pl-2">
-                        {comment.replies!.map((reply) => (
+                        {comment.replies!.filter((reply: any) => reply != null).map((reply) => (
                             <CommentItem
                                 key={reply.id}
                                 comment={reply}
