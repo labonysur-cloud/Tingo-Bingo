@@ -302,16 +302,6 @@ export default function FeedView() {
                 />
             )}
 
-            {/* Search Bar */}
-            <div className="px-4 pt-4">
-                <button
-                    onClick={() => router.push('/search')}
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-white rounded-xl border border-gray-200 hover:border-purple-500 hover:bg-purple-50/50 transition-all shadow-sm"
-                >
-                    <Search className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-400 text-sm font-medium">Search for friends by name or @username</span>
-                </button>
-            </div>
 
             {/* Create Post Widget */}
             <div className="p-4">
