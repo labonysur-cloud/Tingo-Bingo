@@ -219,13 +219,6 @@ export default function FeedView() {
                     {/* Right Actions */}
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setIsMenuOpen(true)}
-                            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-                        >
-                            <Menu className="w-6 h-6 text-gray-700" />
-                        </button>
-
-                        <button
                             onClick={() => router.push('/search')}
                             className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
                         >
@@ -235,19 +228,18 @@ export default function FeedView() {
                         {/* Notification Bell */}
                         <NotificationBell />
 
-                        {/* Refresh Button */}
-                        <button
-                            onClick={handleRefresh}
-                            className={`w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
-                            title="Refresh Feed"
-                        >
-                            <RefreshCw className="w-5 h-5 text-gray-600" />
-                        </button>
-
                         <Link href="/profile" className="w-10 h-10 rounded-full border border-gray-200 overflow-hidden block hover:opacity-80 transition-opacity">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest"} alt="Profile" className="w-full h-full object-cover" />
                         </Link>
+
+                        {/* Menu Toggle - Moved to right */}
+                        <button
+                            onClick={() => setIsMenuOpen(true)}
+                            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                        >
+                            <Menu className="w-6 h-6 text-gray-700" />
+                        </button>
                     </div>
                 </div>
             </header>
