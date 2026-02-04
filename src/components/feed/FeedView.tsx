@@ -433,7 +433,7 @@ export default function FeedView() {
                                         {/* Existing Comments */}
                                         {post.comments && post.comments.length > 0 && (
                                             <div className="px-4 py-3 max-h-96 overflow-y-auto space-y-3">
-                                                {post.comments.map((comment) => (
+                                                {post.comments.map((comment: any) => (
                                                     <CommentItem
                                                         key={comment.id}
                                                         comment={comment}
