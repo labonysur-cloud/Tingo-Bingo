@@ -3,9 +3,12 @@
 import { useAuth } from "@/context/AuthContext";
 import { useSocial } from "@/context/SocialContext";
 import { useChat } from "@/context/ChatContext";
-// import { uploadToCloudinary } from "@/lib/cloudinary";  // No longer needed here
-import { Heart, MessageCircle, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search, Trash2, RefreshCw } from "lucide-react";
+import { Heart, MessageCircle, Plus, Send, Sparkles, Gamepad2, MessageSquare, LayoutGrid, Search, Trash2, RefreshCw, Play, Pause, Menu } from "lucide-react";
+import SideMenu from "../navigation/SideMenu";
 import { formatDistanceToNow } from "date-fns";
+
+
+
 import CreatePost from "./CreatePost";
 import AddStoryModal from "../stories/AddStoryModal";
 import StoryViewer from "../stories/StoryViewer";
@@ -14,8 +17,121 @@ import SaveButton from "../ui/SaveButton";
 import NotificationBell from "../notifications/NotificationBell";
 import CommentItem from "./CommentItem";
 import Link from "next/link";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import toast from "react-hot-toast";
+
+// Minimal Reel Item Component for Feed
+function FeedReelItem({ reel, user }: { reel: any, user: any }) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const router = useRouter();
+
+    const togglePlay = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!videoRef.current) return;
+
+        if (isPlaying) {
+            videoRef.current.pause();
+            setIsPlaying(false);
+        } else {
+            const playPromise = videoRef.current.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        setIsPlaying(true);
+                    })
+                    .catch((error) => {
+                        console.error("Video play failed:", error);
+                        // Optional: Show toast or ignore (e.g. abort error)
+                        setIsPlaying(false);
+                    });
+            }
+        }
+    }
+
+    return (
+        <div
+            className="relative w-full bg-black rounded-[2.5rem] overflow-hidden shadow-2xl shadow-gray-200/50 group cursor-pointer border border-gray-100/10"
+            onClick={() => router.push(`/reels?id=${reel.id}`)}
+        >
+            {/* Video - Intrinsic Height */}
+            <video
+                ref={videoRef}
+                src={reel.video_url}
+                poster={reel.thumbnail_url}
+                className="w-full h-auto block object-contain max-h-[85vh] bg-gray-900"
+                loop
+                muted
+                playsInline
+            />
+
+            {/* Dark Gradient Overlay - Full Cover */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/60 pointer-events-none transition-opacity duration-300" />
+
+            {/* Top Badge */}
+            <div className="absolute top-5 left-5 right-5 flex justify-between items-start z-20 pointer-events-auto">
+                <Link href={`/profile/${reel.user_id}`} onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md px-2 py-1.5 rounded-full border border-white/10 hover:bg-black/50 transition-colors">
+                        <div className="w-8 h-8 rounded-full border border-white/20 p-0.5">
+                            <img src={reel.user?.avatar_url || "/default-avatar.png"} alt={reel.user?.username} className="w-full h-full rounded-full object-cover" />
+                        </div>
+                        <span className="font-bold text-white text-xs pr-2">{reel.user?.username || "Unknown"}</span>
+                    </div>
+                </Link>
+
+                <div className="bg-orange-500/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg shadow-orange-500/20">
+                    <span className="text-[10px] font-black text-white uppercase tracking-wider flex items-center gap-1">
+                        <Play className="w-3 h-3 fill-current" />
+                        Tangii
+                    </span>
+                </div>
+            </div>
+
+            {/* Center Play Button Interaction Area - Only the button captures clicks, container passes through */}
+            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                <div
+                    onClick={(e) => { e.stopPropagation(); togglePlay(e); }}
+                    className={`
+                        w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm border border-white/40 flex items-center justify-center cursor-pointer pointer-events-auto
+                        transition-all duration-300 transform hover:scale-110 active:scale-95
+                        ${isPlaying ? 'opacity-0 scale-50 group-hover:opacity-100 group-hover:scale-100' : 'opacity-100 scale-100'}
+                    `}
+                >
+                    {isPlaying ? <Pause className="w-6 h-6 text-white fill-white" /> : <Play className="w-6 h-6 text-white fill-white ml-1" />}
+                </div>
+            </div>
+
+            {/* Bottom Content */}
+            <div className="absolute bottom-0 left-0 right-0 p-6 z-20 pointer-events-none">
+                <p className="text-white text-base font-medium line-clamp-3 mb-4 drop-shadow-md leading-relaxed">
+                    {reel.caption}
+                </p>
+
+                <div className="flex items-center gap-3 pointer-events-auto">
+                    <button
+                        className="flex-1 bg-white/10 backdrop-blur-md border border-white/20 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-white hover:text-gray-900 transition-all flex items-center justify-center gap-2 group/btn"
+                        onClick={(e) => { e.stopPropagation(); router.push(`/reels?id=${reel.id}`); }}
+                    >
+                        Watch Full Tangii
+                        <Sparkles className="w-4 h-4 text-orange-400 group-hover/btn:text-orange-500" />
+                    </button>
+
+                    <div className="flex gap-2">
+                        <div className="w-10 h-10 rounded-xl bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/90">
+                            <Heart className="w-5 h-5" />
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/90">
+                            <MessageCircle className="w-5 h-5" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 export default function FeedView() {
     const { user } = useAuth();
@@ -26,14 +142,46 @@ export default function FeedView() {
     const [showComments, setShowComments] = useState<{ [key: string]: boolean }>({});
     const [commentText, setCommentText] = useState<{ [key: string]: string | undefined }>({});
     const [isAddingStory, setIsAddingStory] = useState(false);
-    const [viewingStories, setViewingStories] = useState<string | null>(null); // userId of stories being viewed
+    const [viewingStories, setViewingStories] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
+
+    // Tangii State
+    const [reels, setReels] = useState<any[]>([]);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    useEffect(() => {
+        fetchReels();
+    }, []);
+
+    const fetchReels = async () => {
+        const { data } = await supabase
+            .from('reels')
+            .select(`*, user:users(username, avatar_url:avatar)`) // Ensure alias matches usage
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+        if (data) {
+            const formatted = data.map(r => ({
+                ...r,
+                type: 'reel',
+                createdAt: r.created_at // Normalize for sorting
+            }));
+            setReels(formatted);
+        }
+    };
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
-        await refreshFeed();
+        await Promise.all([refreshFeed(), fetchReels()]);
         setTimeout(() => setIsRefreshing(false), 500);
     };
+
+    // Merge Posts and Reels
+    const feedItems = [
+        ...posts.map(p => ({ ...p, type: 'post' })),
+        ...reels
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
 
     // Group stories by user
     const storiesByUser = (stories || []).reduce((acc, story) => {
@@ -44,18 +192,14 @@ export default function FeedView() {
         return acc;
     }, {} as Record<string, typeof stories>);
 
-    // Get unique users with stories (excluding current user if we want separate "Your Story" bubble, but for now mix them or separate)
-    // Let's separate "Your Story" logic if needed, but generic list is fine
     const storyUsers = Object.keys(storiesByUser).filter(id => id !== user?.id);
     const myStories = user ? storiesByUser[user.id] : [];
-
-
 
     const startChat = async (otherUserId: string, otherUserName: string) => {
         if (!user || otherUserId === user.id) return;
         try {
             const chatId = await startConversation(otherUserId);
-            router.push(`/chat?user=${otherUserId}`); // Or push to dynamic route if you prefer
+            router.push(`/chat?user=${otherUserId}`);
         } catch (error) {
             console.error("Failed to start chat", error);
         }
@@ -64,7 +208,7 @@ export default function FeedView() {
     return (
         <main className="pb-24 bg-gray-50 min-h-screen">
             {/* Simple Header */}
-            <header className="sticky top-0 bg-white border-b border-gray-200 z-10 px-4 py-3 shadow-sm">
+            <header className="sticky top-0 bg-white border-b border-gray-200 z-50 px-4 py-3 shadow-sm">
                 <div className="flex justify-between items-center">
                     {/* Logo */}
                     <div className="flex items-center gap-2">
@@ -74,6 +218,13 @@ export default function FeedView() {
 
                     {/* Right Actions */}
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setIsMenuOpen(true)}
+                            className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                        >
+                            <Menu className="w-6 h-6 text-gray-700" />
+                        </button>
+
                         <button
                             onClick={() => router.push('/search')}
                             className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
@@ -102,7 +253,7 @@ export default function FeedView() {
             </header>
 
             {/* Stories Bar */}
-            <div className="flex gap-4 p-4 overflow-x-auto no-scrollbar border-b border-gray-100 bg-white shadow-sm">
+            <div className="flex gap-4 p-4 overflow-x-auto no-scrollbar border-b border-gray-100 bg-white shadow-sm z-40 relative">
                 {/* Add Story Button */}
                 <div
                     className="flex flex-col items-center flex-shrink-0 cursor-pointer group"
@@ -175,38 +326,23 @@ export default function FeedView() {
                 <CreatePost />
             </div>
 
-            {/* Feature Banners */}
-            <div className="px-4 grid grid-cols-2 gap-3 mb-6">
-                <Link href="/moodboard">
-                    <div className="bg-gradient-to-br from-pink-500 to-rose-400 text-white p-4 rounded-2xl flex flex-col justify-between h-24 shadow-lg hover:transform hover:scale-[1.02] transition-all">
-                        <LayoutGrid className="w-6 h-6 text-white mb-auto" />
-                        <span className="font-semibold text-sm">Mood Board</span>
-                    </div>
-                </Link>
-                <Link href="/ai">
-                    <div className="bg-gradient-to-br from-gray-900 to-gray-800 text-white p-4 rounded-2xl flex flex-col justify-between h-24 shadow-lg hover:transform hover:scale-[1.02] transition-all">
-                        <Sparkles className="w-6 h-6 text-accent mb-auto" />
-                        <span className="font-semibold text-sm">Zoothopilia AI</span>
-                    </div>
-                </Link>
-                <Link href="/gaming">
-                    <div className="bg-gradient-to-br from-accent to-yellow-400 text-gray-900 p-4 rounded-2xl flex flex-col justify-between h-24 shadow-lg hover:transform hover:scale-[1.02] transition-all col-span-2">
-                        <div className="flex items-center gap-3">
-                            <Gamepad2 className="w-6 h-6 text-gray-800" />
-                            <span className="font-semibold text-sm">Pet Arcade & Contests</span>
-                        </div>
-                    </div>
-                </Link>
-            </div>
+            {/* Feature Banners REMOVED - Moved to SideMenu */}
 
             {/* Feed Stream */}
             <div className="flex flex-col gap-6 px-4 pb-4">
-                {posts.length === 0 ? (
+                {feedItems.length === 0 ? (
                     <div className="text-center py-10 opacity-50">
                         <p>No posts yet. Be the first!</p>
                     </div>
                 ) : (
-                    posts.map((post) => {
+                    feedItems.map((item: any) => {
+                        // Render Tangii Reel
+                        if (item.type === 'reel') {
+                            return <FeedReelItem key={`reel-${item.id}`} reel={item} user={user} />;
+                        }
+
+                        // Render Standard Post
+                        const post = item;
                         return (
                             <div key={post.id} className="bg-white rounded-3xl shadow-soft border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 {/* Post Header */}
@@ -372,6 +508,8 @@ export default function FeedView() {
                     })
                 )}
             </div>
+            {/* Side Menu */}
+            <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
         </main >
     );
 }
