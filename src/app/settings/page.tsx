@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { ArrowLeft, ChevronRight, User, HelpCircle, Info, LogOut, Shield, Heart, Trash2, AlertTriangle, X, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, User, HelpCircle, Info, LogOut, Shield, Trash2, AlertTriangle, X, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -134,8 +134,8 @@ export default function SettingsView() {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/logo.png" alt="TingoBingo" className="w-full h-full object-contain" />
                         </div>
-                        <p className="text-xs text-gray-500 font-medium">TingoBingo v1.0.0</p>
-                        <p className="text-xs text-gray-400 flex items-center gap-1">Made with <Heart className="w-3 h-3 text-red-400 fill-current" /> for Pets</p>
+                        <p className="text-xs text-gray-500 font-medium">TingoBingo v2.0.0</p>
+                        <p className="text-xs text-gray-400">&copy; 2026 TingoBingo. All rights reserved.</p>
                     </div>
                 </section>
             </div>
