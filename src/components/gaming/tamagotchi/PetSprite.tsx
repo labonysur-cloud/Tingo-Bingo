@@ -21,7 +21,7 @@ export default function PetSprite({ pet, action }: PetSpriteProps) {
         }
     };
 
-    const variants = {
+    const variants: any = {
         idle: {
             y: [0, -10, 0],
             transition: { repeat: Infinity, duration: 2, ease: "easeInOut" }
