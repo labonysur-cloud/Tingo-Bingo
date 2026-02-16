@@ -5,6 +5,7 @@ import { Trophy, Gamepad2, Coins, Play, Star } from "lucide-react";
 import { GameProvider, useGame } from "@/context/GameContext";
 import CatchTheLazr from "./CatchTheLazr";
 import TingoJump from "./TingoJump";
+import TamagotchiGame from "./tamagotchi/TamagotchiGame";
 
 function GamingHubContent() { // Inner component to use context
     const { coins, getLeaderboard } = useGame();
@@ -48,6 +49,29 @@ function GamingHubContent() { // Inner component to use context
 
             {/* Game Launchers */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+
+                {/* Tamagotchi Card */}
+                <div
+                    onClick={() => setActiveGame('tamagotchi')}
+                    className="md:col-span-2 bg-gradient-to-r from-pink-400 to-purple-500 text-white p-8 rounded-3xl relative overflow-hidden shadow-xl cursor-pointer group hover:scale-[1.01] transition-all"
+                >
+                    <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                        <div>
+                            <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur rounded-full text-[10px] font-bold uppercase tracking-wide mb-3 border border-white/20">New Arrival</span>
+                            <h2 className="text-4xl font-black mb-2 flex items-center gap-3">
+                                🥚 TINAGOTCHI
+                            </h2>
+                            <p className="text-pink-50 text-lg font-medium max-w-md">Adopt your own virtual pet! Feed, play, and watch them grow. Can you raise the happiest pet in the arcade?</p>
+                        </div>
+                        <button className="bg-white text-pink-600 px-8 py-4 rounded-2xl font-black text-lg hover:bg-pink-50 transition-colors shadow-lg flex items-center gap-2 group-hover:scale-110 duration-300">
+                            <Play className="w-5 h-5 fill-current" /> Adopt Now
+                        </button>
+                    </div>
+                    {/* Decor */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                    <div className="absolute bottom-0 left-20 w-32 h-32 bg-purple-600/20 rounded-full blur-2xl"></div>
+                    <div className="absolute top-10 right-10 text-6xl animate-bounce">🐱</div>
+                </div>
 
                 {/* Tingo Jump Card */}
                 <div
@@ -127,8 +151,9 @@ function GamingHubContent() { // Inner component to use context
             {/* Active Game Modal */}
             {activeGame === 'catch-lazr' && <CatchTheLazr onClose={() => setActiveGame(null)} />}
             {activeGame === 'tingo-jump' && <TingoJump onClose={() => setActiveGame(null)} />}
+            {activeGame === 'tamagotchi' && <TamagotchiGame onClose={() => setActiveGame(null)} />}
 
-        </div>
+        </div >
     );
 }
 

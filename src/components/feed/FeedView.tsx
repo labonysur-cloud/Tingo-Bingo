@@ -135,7 +135,7 @@ function FeedReelItem({ reel, user }: { reel: any, user: any }) {
 
 export default function FeedView() {
     const { user } = useAuth();
-    const { posts, addPost, likePost, savePost, addComment, likeComment, deletePost, stories, refreshFeed } = useSocial();
+    const { posts, addPost, likePost, savePost, addComment, likeComment, deletePost, deleteComment, stories, refreshFeed } = useSocial();
     const { startConversation } = useChat();
     const router = useRouter();
 
@@ -420,6 +420,8 @@ export default function FeedView() {
                                                         key={comment.id}
                                                         comment={comment}
                                                         postId={post.id}
+                                                        postOwnerId={post.userId}
+                                                        currentUserId={user?.id}
                                                         onReply={(commentId, parentName) => {
                                                             // Set comment text with @mention
                                                             setCommentText({
@@ -430,6 +432,11 @@ export default function FeedView() {
                                                         }}
                                                         onLike={(commentId, postId) => {
                                                             likeComment(commentId, postId);
+                                                        }}
+                                                        onDelete={(commentId) => {
+                                                            if (confirm('Delete this comment?')) {
+                                                                deleteComment(commentId, post.id);
+                                                            }
                                                         }}
                                                     />
                                                 ))}

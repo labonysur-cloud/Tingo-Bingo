@@ -1,24 +1,40 @@
 "use client";
 
 import { Comment } from "@/context/SocialContext";
-import { Heart, Reply, ChevronDown, ChevronUp } from "lucide-react";
+import { Heart, Reply, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 interface CommentItemProps {
     comment: Comment;
     postId: string;
+    postOwnerId: string;
+    currentUserId?: string;
     onReply: (commentId: string, parentName: string) => void;
     onLike: (commentId: string, postId: string) => void;
+    onDelete: (commentId: string) => void;
     depth?: number; // Track nesting depth
 }
 
-export default function CommentItem({ comment, postId, onReply, onLike, depth = 0 }: CommentItemProps) {
+export default function CommentItem({ comment, postId, postOwnerId, currentUserId, onReply, onLike, onDelete, depth = 0 }: CommentItemProps) {
     const [showReplies, setShowReplies] = useState(false); // Default to collapsed
     const hasReplies = comment.replies && Array.isArray(comment.replies) && comment.replies.length > 0;
 
+    // Permission Check: Comment Owner OR Post Owner
+    const canDelete = currentUserId && (comment.userId === currentUserId || postOwnerId === currentUserId);
+
+    // Debug log - Remove in production
+    if (currentUserId) {
+        // console.log(`Comment ${comment.id} Debug:`, {
+        //     canDelete, 
+        //     currentUser: currentUserId, 
+        //     commentUser: comment.userId, 
+        //     postOwner: postOwnerId
+        // });
+    }
+
     return (
-        <div className={`flex gap-2 ${depth > 0 ? 'ml-8 mt-2' : 'mt-3'}`}>
+        <div className={`flex gap-2 ${depth > 0 ? 'ml-8 mt-2' : 'mt-3'} group/comment`}>
             {/* Avatar */}
             <Link href={`/profile/${comment.userId}`}>
                 <img
@@ -30,10 +46,23 @@ export default function CommentItem({ comment, postId, onReply, onLike, depth = 
 
             {/* Comment Content */}
             <div className="flex-1 min-w-0">
-                <div className="bg-gray-50 hover:bg-gray-100 transition-colors rounded-2xl px-4 py-2.5 shadow-sm border border-gray-100">
-                    <Link href={`/profile/${comment.userId}`}>
-                        <p className="font-bold text-sm text-gray-900 hover:underline">{comment.userName}</p>
-                    </Link>
+                <div className="bg-gray-50 hover:bg-gray-100 transition-colors rounded-2xl px-4 py-2.5 shadow-sm border border-gray-100 relative group-hover/comment:bg-white group-hover/comment:shadow-md">
+                    <div className="flex justify-between items-start">
+                        <Link href={`/profile/${comment.userId}`}>
+                            <p className="font-bold text-sm text-gray-900 hover:underline">{comment.userName}</p>
+                        </Link>
+
+                        {/* Delete Button (Visible on Hover or permitted) */}
+                        {canDelete && (
+                            <button
+                                onClick={() => onDelete(comment.id)}
+                                className="text-gray-400 hover:text-red-500 p-1 transition-colors"
+                                title="Delete comment"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
                     <p className="text-gray-700 text-sm mt-0.5 break-words">{comment.text}</p>
                 </div>
 
@@ -100,8 +129,11 @@ export default function CommentItem({ comment, postId, onReply, onLike, depth = 
                                 key={reply.id}
                                 comment={reply}
                                 postId={postId}
+                                postOwnerId={postOwnerId}
+                                currentUserId={currentUserId}
                                 onReply={onReply}
                                 onLike={onLike}
+                                onDelete={onDelete}
                                 depth={depth + 1}
                             />
                         ))}

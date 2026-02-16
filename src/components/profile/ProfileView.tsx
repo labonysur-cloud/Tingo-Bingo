@@ -350,7 +350,7 @@ function ProfileReelItem({ reel, currentUser, isOwner, onDelete }: {
 
 export default function ProfileView({ userId }: ProfileViewProps) {
     const { user: currentUser, logout, isLoading: authLoading } = useAuth();
-    const { addComment, likeComment, likePost, savePost, deletePost, getComments, posts: allPosts } = useSocial();
+    const { addComment, likeComment, likePost, savePost, deletePost, deleteComment, getComments, posts: allPosts } = useSocial();
     const router = useRouter();
 
     // Determine which user to show
@@ -515,10 +515,13 @@ export default function ProfileView({ userId }: ProfileViewProps) {
         if (!confirm('Are you sure you want to delete this Tangii?')) return;
 
         try {
-            const { error } = await supabase
-                .from('reels')
-                .delete()
-                .eq('id', reelId);
+            const { data: success, error } = await supabase.rpc('force_delete_reel', {
+                reel_id_param: reelId,
+                user_id_param: currentUser!.id
+            });
+
+            if (error) throw error;
+            if (!success) throw new Error("Ownership check failed");
 
             if (error) throw error;
 
@@ -963,6 +966,8 @@ export default function ProfileView({ userId }: ProfileViewProps) {
                                                                 key={comment.id}
                                                                 comment={comment}
                                                                 postId={post.id}
+                                                                postOwnerId={post.userId}
+                                                                currentUserId={currentUser?.id}
                                                                 onReply={(commentId, parentName) => {
                                                                     setCommentText({
                                                                         ...commentText,
@@ -973,6 +978,7 @@ export default function ProfileView({ userId }: ProfileViewProps) {
                                                                 onLike={(commentId, postId) => {
                                                                     likeComment(commentId, postId);
                                                                 }}
+                                                                onDelete={(commentId) => deleteComment(commentId, post.id)}
                                                             />
                                                         ))}
                                                     </div>

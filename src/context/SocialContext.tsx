@@ -548,6 +548,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             console.log('📊 Current like status:', post.isLikedByMe);
 
             const authSupabase = await getAuthenticatedSupabase();
+            let operationSucceeded = false;
 
             if (post.isLikedByMe) {
                 // Unlike
@@ -564,15 +565,16 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                     throw error;
                 }
                 console.log('✅ Unlike successful:', data);
+                operationSucceeded = true;
             } else {
                 // Like
                 console.log('👍 Liking post...');
                 const { error, data } = await authSupabase
                     .from('post_likes')
-                    .insert({
+                    .upsert({
                         post_id: postId,
                         user_id: user.id
-                    })
+                    }, { onConflict: 'post_id, user_id', ignoreDuplicates: true })
                     .select();
 
                 if (error) {
@@ -583,54 +585,59 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
                         code: error.code
                     });
                     throw error;
+                } else {
+                    console.log('✅ Like successful:', data);
+                    operationSucceeded = true;
                 }
-                console.log('✅ Like successful:', data);
             }
 
-            // Optimistic UI update FIRST (instant feedback)
-            setPosts(prev => prev.map(p => {
-                if (p.id === postId) {
-                    const newIsLiked = !p.isLikedByMe;
-                    const newLikesCount = newIsLiked ? p.likesCount + 1 : p.likesCount - 1;
-                    console.log(`🔄 Optimistic update: ${p.likesCount} → ${newLikesCount}, liked: ${newIsLiked}`);
-                    return {
-                        ...p,
-                        isLikedByMe: newIsLiked,
-                        likesCount: Math.max(0, newLikesCount) // Never go below 0
-                    };
-                }
-                return p;
-            }));
-
-            // Fetch updated post from database to sync with server
-            setTimeout(async () => {
-                try {
-                    const { data: updatedPost } = await supabase
-                        .from('posts')
-                        .select('likes_count')
-                        .eq('id', postId)
-                        .single();
-
-                    if (updatedPost) {
-                        setPosts(prev => prev.map(p => {
-                            if (p.id === postId) {
-                                console.log(`✅ Synced from DB: likes_count = ${updatedPost.likes_count}`);
-                                return {
-                                    ...p,
-                                    likesCount: updatedPost.likes_count || 0
-                                };
-                            }
-                            return p;
-                        }));
+            // ONLY update UI if operation succeeded
+            if (operationSucceeded) {
+                setPosts(prev => prev.map(p => {
+                    if (p.id === postId) {
+                        const newIsLiked = !p.isLikedByMe;
+                        const newLikesCount = newIsLiked ? p.likesCount + 1 : p.likesCount - 1;
+                        console.log(`🔄 UI update: ${p.likesCount} → ${newLikesCount}, liked: ${newIsLiked}`);
+                        return {
+                            ...p,
+                            isLikedByMe: newIsLiked,
+                            likesCount: Math.max(0, newLikesCount)
+                        };
                     }
-                } catch (error) {
-                    console.error('⚠️ Failed to sync likes from DB:', error);
-                }
-            }, 1000); // Wait 1 second for trigger to fire
+                    return p;
+                }));
+
+                // Sync with database after trigger fires
+                setTimeout(async () => {
+                    try {
+                        const { data: updatedPost } = await supabase
+                            .from('posts')
+                            .select('likes_count')
+                            .eq('id', postId)
+                            .single();
+
+                        if (updatedPost) {
+                            setPosts(prev => prev.map(p => {
+                                if (p.id === postId) {
+                                    console.log(`✅ Synced from DB: likes_count = ${updatedPost.likes_count}`);
+                                    return {
+                                        ...p,
+                                        likesCount: updatedPost.likes_count || 0
+                                    };
+                                }
+                                return p;
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('⚠️ Failed to sync likes from DB:', error);
+                    }
+                }, 1000);
+            }
 
         } catch (error: any) {
             console.error("❌ Error liking post:", error);
             showToast.error(`Failed to like post: ${error.message || 'Unknown error'}`);
+            // Don't update UI on error - keep current state
         }
     };
 
@@ -649,6 +656,8 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
             const authSupabase = await getAuthenticatedSupabase();
 
+            let operationSucceeded = false;
+
             if (post.isSavedByMe) {
                 // Unsave
                 const { error } = await authSupabase
@@ -659,35 +668,42 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
                 if (error) throw error;
                 showToast.success('Post removed from Moodboard');
+                operationSucceeded = true;
             } else {
                 // Save
                 const { error } = await authSupabase
                     .from('post_saves')
-                    .insert({
+                    .upsert({
                         post_id: postId,
                         user_id: user.id
-                    });
+                    }, { onConflict: 'post_id, user_id', ignoreDuplicates: true });
 
                 if (error) throw error;
-                showToast.success('Post saved to Moodboard');
+                operationSucceeded = true;
+
+                if (operationSucceeded) {
+                    showToast.success('Post saved to Moodboard');
+                }
             }
 
-            // Optimistic UI update
-            setPosts(prev => prev.map(p => {
-                if (p.id === postId) {
-                    const newIsSaved = !p.isSavedByMe;
-                    const newSavesCount = newIsSaved
-                        ? (p.savesCount || 0) + 1
-                        : Math.max(0, (p.savesCount || 0) - 1);
+            // Optimistic UI update IF successful
+            if (operationSucceeded) {
+                setPosts(prev => prev.map(p => {
+                    if (p.id === postId) {
+                        const newIsSaved = !p.isSavedByMe;
+                        const newSavesCount = newIsSaved
+                            ? (p.savesCount || 0) + 1
+                            : Math.max(0, (p.savesCount || 0) - 1);
 
-                    return {
-                        ...p,
-                        isSavedByMe: newIsSaved,
-                        savesCount: newSavesCount
-                    };
-                }
-                return p;
-            }));
+                        return {
+                            ...p,
+                            isSavedByMe: newIsSaved,
+                            savesCount: newSavesCount
+                        };
+                    }
+                    return p;
+                }));
+            }
 
         } catch (error: any) {
             console.error("❌ Error saving post:", error);
@@ -879,6 +895,56 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
         const sanitized = sanitizeText(text);
 
+        // Optimistic UI Update: Create temporary comment
+        const tempId = `temp-${Date.now()}`;
+        const newComment: Comment = {
+            id: tempId,
+            postId,
+            userId: user.id,
+            userName: user.name || 'You',
+            userAvatar: user.avatar || '',
+            text: sanitized,
+            createdAt: new Date().toISOString(),
+            parent_comment_id: parentCommentId || null,
+            likes_count: 0,
+            isLikedByMe: false,
+            replies: []
+        };
+
+        // Recursively add comment to tree
+        const addCommentToTree = (comments: Comment[]): Comment[] => {
+            if (!parentCommentId) {
+                return [newComment, ...comments];
+            }
+            return comments.map(c => {
+                if (c.id === parentCommentId) {
+                    return {
+                        ...c,
+                        replies: c.replies ? [...c.replies, newComment] : [newComment]
+                    };
+                }
+                if (c.replies && c.replies.length > 0) {
+                    return {
+                        ...c,
+                        replies: addCommentToTree(c.replies)
+                    };
+                }
+                return c;
+            });
+        };
+
+        // Update local state immediately
+        setPosts(prev => prev.map(p => {
+            if (p.id === postId) {
+                return {
+                    ...p,
+                    commentsCount: p.commentsCount + 1,
+                    comments: addCommentToTree(p.comments || [])
+                };
+            }
+            return p;
+        }));
+
         try {
             const authSupabase = await getAuthenticatedSupabase();
             const { error } = await authSupabase
@@ -894,18 +960,30 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
             showToast.success(parentCommentId ? 'Reply added!' : 'Comment added!');
 
-            // Update comments count optimistically (for BOTH top-level and replies)
-            // Since we now count ALL comments, increment regardless of parent
-            setPosts(prev => prev.map(p => {
-                if (p.id === postId) {
-                    return { ...p, commentsCount: p.commentsCount + 1 };
-                }
-                return p;
-            }));
+            // Realtime subscription will fetch authentic data and replace our temp comment
         } catch (error: any) {
             console.error("❌ Error adding comment:", error);
             showToast.error('Failed to add comment');
-            throw error;
+
+            // Revert optimistic update on error
+            setPosts(prev => prev.map(p => {
+                if (p.id === postId) {
+                    // Helper to remove temp comment
+                    const removeCommentFromTree = (comments: Comment[]): Comment[] => {
+                        return comments.filter(c => c.id !== tempId).map(c => ({
+                            ...c,
+                            replies: c.replies ? removeCommentFromTree(c.replies) : []
+                        }));
+                    };
+
+                    return {
+                        ...p,
+                        commentsCount: Math.max(0, p.commentsCount - 1),
+                        comments: removeCommentFromTree(p.comments || [])
+                    };
+                }
+                return p;
+            }));
         }
     };
 
@@ -941,6 +1019,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             if (!comment) return;
 
             const authSupabase = await getAuthenticatedSupabase();
+            let operationSucceeded = false;
 
             if (comment.isLikedByMe) {
                 // Unlike
@@ -952,53 +1031,58 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
                 if (error) throw error;
                 console.log('👎 Comment unliked');
+                operationSucceeded = true;
             } else {
                 // Like
                 const { error } = await authSupabase
                     .from('comment_likes')
-                    .insert({
+                    .upsert({
                         comment_id: commentId,
                         user_id: user.id
-                    });
+                    }, { onConflict: 'comment_id, user_id', ignoreDuplicates: true });
 
                 if (error) throw error;
                 console.log('👍 Comment liked');
+                operationSucceeded = true;
             }
 
-            // Optimistic update: Update the comment's like status
-            const updateCommentLikes = (comments: Comment[]): Comment[] => {
-                return comments.map(c => {
-                    if (c.id === commentId) {
-                        const newIsLiked = !c.isLikedByMe;
-                        const newLikesCount = newIsLiked
-                            ? (c.likes_count || 0) + 1
-                            : Math.max(0, (c.likes_count || 0) - 1);
+            // Optimistic update IF successful
+            if (operationSucceeded) {
+                const updateCommentLikes = (comments: Comment[]): Comment[] => {
+                    return comments.map(c => {
+                        if (c.id === commentId) {
+                            const newIsLiked = !c.isLikedByMe;
+                            const newLikesCount = newIsLiked
+                                ? (c.likes_count || 0) + 1
+                                : Math.max(0, (c.likes_count || 0) - 1);
 
+                            return {
+                                ...c,
+                                isLikedByMe: newIsLiked,
+                                likes_count: newLikesCount
+                            };
+                        }
+                        if (c.replies) {
+                            return {
+                                ...c,
+                                replies: updateCommentLikes(c.replies)
+                            };
+                        }
+                        return c;
+                    });
+                };
+
+                setPosts(prev => prev.map(p => {
+                    if (p.id === postId && p.comments) {
                         return {
-                            ...c,
-                            isLikedByMe: newIsLiked,
-                            likes_count: newLikesCount
+                            ...p,
+                            comments: updateCommentLikes(p.comments)
                         };
                     }
-                    if (c.replies) {
-                        return {
-                            ...c,
-                            replies: updateCommentLikes(c.replies)
-                        };
-                    }
-                    return c;
-                });
-            };
+                    return p;
+                }));
+            }
 
-            setPosts(prev => prev.map(p => {
-                if (p.id === postId && p.comments) {
-                    return {
-                        ...p,
-                        comments: updateCommentLikes(p.comments)
-                    };
-                }
-                return p;
-            }));
 
         } catch (error: any) {
             console.error("❌ Error liking comment:", error);
@@ -1015,21 +1099,31 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
         try {
             const authSupabase = await getAuthenticatedSupabase();
-            const { error } = await authSupabase
-                .from('posts')
-                .delete()
-                .eq('id', postId)
-                .eq('user_id', user.id);
 
-            if (error) throw error;
+            // USE FORCE DELETE (Bypasses RLS)
+            const { data: success, error } = await authSupabase.rpc('force_delete_post', {
+                post_id_param: postId,
+                user_id_param: user.id
+            });
 
-            showToast.success('Post deleted');
+            if (error) {
+                console.error("❌ DB Error deleting post:", error);
+                throw error;
+            }
+
+            if (!success) {
+                console.error("❌ Force Delete failed: Ownership mismatch or post not found.");
+                showToast.error('Could not delete. Ownership check failed.');
+                return;
+            }
+
+            showToast.success('Post deleted successfully');
 
             // Optimistic UI update
             setPosts(prev => prev.filter(p => p.id !== postId));
         } catch (error: any) {
             console.error("❌ Error deleting post:", error);
-            showToast.error('Failed to delete post');
+            showToast.error(`Failed to delete: ${error.message || 'Unknown error'}`);
         }
     };
 
@@ -1041,17 +1135,27 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
         try {
             const authSupabase = await getAuthenticatedSupabase();
-            const { error } = await authSupabase
-                .from('comments')
-                .delete()
-                .eq('id', commentId)
-                .eq('user_id', user.id);
 
-            if (error) throw error;
+            // USE FORCE DELETE (Bypasses RLS)
+            const { data: success, error } = await authSupabase.rpc('force_delete_comment', {
+                comment_id_param: commentId,
+                user_id_param: user.id
+            });
+
+            if (error) {
+                console.error("❌ DB Error deleting comment:", error);
+                throw error;
+            }
+
+            if (!success) {
+                console.error("❌ Force Delete failed: Ownership mismatch or comment not found.");
+                showToast.error('You cannot delete this comment.');
+                return;
+            }
 
             showToast.success('Comment deleted');
 
-            // Update comments count
+            // Update comments count locally
             setPosts(prev => prev.map(p => {
                 if (p.id === postId) {
                     return { ...p, commentsCount: Math.max(0, p.commentsCount - 1) };
@@ -1060,7 +1164,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             }));
         } catch (error: any) {
             console.error("❌ Error deleting comment:", error);
-            showToast.error('Failed to delete comment');
+            showToast.error(`Failed to delete comment: ${error.message || 'Unknown error'}`);
         }
     };
 
