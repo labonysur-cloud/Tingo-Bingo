@@ -18,6 +18,26 @@ export const metadata: Metadata = {
     icon: "/logo.ico",
     apple: "/logo.png",
   },
+  verification: {
+    google: "bI2y6XKt4h6rbKn7ZQisbN908sIoerFqipjARbL8-h4",
+  },
+  keywords: ["TingoBingo", "Labony Sur", "Pet Social Network", "Pet Shop", "Bingo", "Tingo"],
+  authors: [{ name: "Labony Sur" }],
+  openGraph: {
+    title: "TingoBingo",
+    description: "Social network, shop, and utility for pet lovers",
+    url: "https://tingo-bingo.vercel.app/",
+    siteName: "TingoBingo",
+    images: [
+      {
+        url: "https://tingo-bingo.vercel.app/logo.png",
+        width: 800,
+        height: 600,
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
 };
 
 export const viewport: Viewport = {
