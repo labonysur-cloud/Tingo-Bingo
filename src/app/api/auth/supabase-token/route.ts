@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SignJWT } from 'jose';
 
-const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
-
 /**
  * POST /api/auth/supabase-token
  * 
@@ -13,10 +11,12 @@ const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
  */
 export async function POST(request: NextRequest) {
     try {
+        const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
+
         if (!SUPABASE_JWT_SECRET) {
             console.error('❌ SUPABASE_JWT_SECRET is not configured');
             return NextResponse.json(
-                { error: 'Server misconfiguration: JWT secret missing' },
+                { error: 'Server misconfiguration: JWT secret missing', detail: 'SUPABASE_JWT_SECRET env var is not set' },
                 { status: 500 }
             );
         }

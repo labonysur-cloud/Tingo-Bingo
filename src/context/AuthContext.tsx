@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (!response.ok) {
                 const err = await response.json();
-                console.error('❌ Failed to mint Supabase token:', err);
+                console.error('❌ Failed to mint Supabase token:', err.error, err.detail || '');
                 return false;
             }
 
