@@ -147,14 +147,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }, [activeConversationId, client, supabaseReady]);
 
     // ==========================================
-    // 3. Realtime subscription for active conversation
-    //    Stable — NOT torn down on send
-    //    Uses authenticated client so RLS filters events
+    // 3. Single realtime subscription for ALL messages
+    //    Handles both active chat messages and conversation list updates
+    //    Using one channel avoids the "mismatch" binding error
     // ==========================================
     useEffect(() => {
-        if (!activeConversationId || !supabaseReady) return;
-
-        console.log('🔔 Setting up authenticated realtime subscription for chat:', activeConversationId);
+        if (!user || !supabaseReady) return;
 
         // Authenticate the realtime connection BEFORE subscribing
         const jwt = getCurrentJwt();
@@ -164,68 +162,28 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
 
         const channel = client
-            .channel(`chat:${activeConversationId}`)
+            .channel(`user-messages:${user.id}`)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'messages',
-                filter: `chat_id=eq.${activeConversationId}`
             }, (payload) => {
                 console.log('🔔 Real-time message received:', payload);
                 const newMessage = payload.new as Message;
 
-                // Deduplicate: only add if not already in state
-                setMessages(prev => {
-                    if (prev.some(m => m.id === newMessage.id)) {
-                        console.log('⏭️ Skipping duplicate message:', newMessage.id);
-                        return prev;
-                    }
-                    console.log('➕ Adding realtime message to UI:', newMessage.id);
-                    return [...prev, newMessage];
-                });
+                // If message belongs to the active conversation, add it to messages
+                if (newMessage.chat_id === activeConversationId) {
+                    setMessages(prev => {
+                        if (prev.some(m => m.id === newMessage.id)) {
+                            console.log('⏭️ Skipping duplicate message:', newMessage.id);
+                            return prev;
+                        }
+                        console.log('➕ Adding realtime message to UI:', newMessage.id);
+                        return [...prev, newMessage];
+                    });
+                }
 
-                // Update conversation last_message in sidebar
-                setConversations(prev => prev.map(c => {
-                    if (c.id === activeConversationId) {
-                        return { ...c, last_message: newMessage };
-                    }
-                    return c;
-                }));
-            })
-            .subscribe((status, err) => {
-                console.log('🔔 Subscription status:', status);
-                if (err) console.error('🔔 Subscription error:', err);
-            });
-
-        return () => {
-            console.log('🔕 Removing subscription for chat:', activeConversationId);
-            client.removeChannel(channel);
-        };
-    }, [activeConversationId, supabaseReady, client]);
-
-    // ==========================================
-    // 4. Global subscription for conversation list updates
-    //    RLS ensures we only receive events for our own chats
-    // ==========================================
-    useEffect(() => {
-        if (!user || !supabaseReady) return;
-
-        // Authenticate the realtime connection BEFORE subscribing
-        const jwt = getCurrentJwt();
-        if (jwt) {
-            client.realtime.setAuth(jwt);
-        }
-
-        const globalChannel = client
-            .channel(`user-global-messages:${user.id}`)
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'messages',
-            }, (payload) => {
-                const newMessage = payload.new as Message;
-
-                // Update conversations list
+                // Update conversation list sidebar with last message
                 setConversations(prev => {
                     const chatExists = prev.some(c => c.id === newMessage.chat_id);
                     if (chatExists) {
@@ -236,21 +194,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                             return c;
                         });
                     }
+                    // New conversation — refetch the list
                     fetchConversations();
                     return prev;
                 });
             })
             .subscribe((status, err) => {
                 if (status === 'SUBSCRIBED') {
-                    console.log('🌐 Global messages subscription active (secured by RLS)');
+                    console.log('🌐 Messages subscription active (secured by RLS)');
                 }
-                if (err) console.error('🌐 Global subscription error:', err);
+                if (err) console.error('🌐 Subscription error:', err);
             });
 
         return () => {
-            client.removeChannel(globalChannel);
+            client.removeChannel(channel);
         };
-    }, [user, supabaseReady, client, fetchConversations]);
+    }, [user, supabaseReady, client, activeConversationId, fetchConversations]);
 
     // ==========================================
     // 5. Initial load
