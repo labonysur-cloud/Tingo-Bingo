@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Check, Loader2 } from "lucide-react";
 import { useSocial, Story } from "@/context/SocialContext";
-import { getAuthenticatedSupabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { showToast } from "../ui/Toaster";
 
@@ -24,7 +24,7 @@ export default function CreateHighlightModal({ onClose, initialStoryId }: Create
     useEffect(() => {
         const fetchAllMyStories = async () => {
             if (!user) return;
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
             const { data } = await authSupabase
                 .from('stories')
                 .select('*')

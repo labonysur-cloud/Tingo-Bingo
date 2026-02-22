@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { getAuthenticatedSupabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { ArrowLeft, Camera, Loader2, Save } from "lucide-react";
 import Link from "next/link";
@@ -60,7 +60,7 @@ export default function AddPetPage() {
             }
 
             // 2. Insert pet into Supabase with authentication
-            const supabase = await getAuthenticatedSupabase();
+            const supabase = getSupabaseClient();
             const { data, error } = await supabase
                 .from('pets')
                 .insert({

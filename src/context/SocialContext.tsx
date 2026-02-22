@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { supabase, getAuthenticatedSupabase } from "@/lib/supabase";
+import { supabase, getSupabaseClient } from "@/lib/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { showToast } from "@/components/ui/Toaster";
 import { sanitizeText } from "@/lib/sanitize";
@@ -295,7 +295,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             if (!mediaUrl) throw new Error("Upload failed");
 
             // 2. Insert to DB
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
             const { error } = await authSupabase.from('stories').insert({
                 user_id: user.id,
                 media_url: mediaUrl,
@@ -319,7 +319,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     const deleteStory = async (storyId: string) => {
         if (!user) return;
         try {
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
             const { error } = await authSupabase
                 .from('stories')
                 .delete()
@@ -395,7 +395,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         if (!user) return;
 
         try {
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
 
             // 1. Create Highlight
             const { data: highlight, error: hError } = await authSupabase
@@ -435,7 +435,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
     const deleteHighlight = async (highlightId: string) => {
         if (!user) return;
         try {
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
             const { error } = await authSupabase
                 .from('highlights')
                 .delete()
@@ -459,7 +459,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         if (!user) return;
         try {
             // Verify ownership of highlight (optional strictly if RLS handles it, but good for UI)
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
 
             // We need to query the junction table
             // But junction table doesn't have user_id, it relies on highlight's user_id or RLS
@@ -495,7 +495,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         const sanitizedCaption = sanitizeText(caption);
 
         try {
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
             const { data, error } = await authSupabase
                 .from('posts')
                 .insert({
@@ -547,7 +547,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
 
             console.log('📊 Current like status:', post.isLikedByMe);
 
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
             let operationSucceeded = false;
 
             if (post.isLikedByMe) {
@@ -654,7 +654,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             const post = posts.find(p => p.id === postId);
             if (!post) return;
 
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
 
             let operationSucceeded = false;
 
@@ -946,7 +946,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         }));
 
         try {
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
             const { error } = await authSupabase
                 .from('comments')
                 .insert({
@@ -1018,7 +1018,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
             const comment = findComment(post.comments);
             if (!comment) return;
 
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
             let operationSucceeded = false;
 
             if (comment.isLikedByMe) {
@@ -1098,7 +1098,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         if (!user) return;
 
         try {
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
 
             // USE FORCE DELETE (Bypasses RLS)
             const { data: success, error } = await authSupabase.rpc('force_delete_post', {
@@ -1134,7 +1134,7 @@ export function SocialProvider({ children }: { children: React.ReactNode }) {
         if (!user) return;
 
         try {
-            const authSupabase = await getAuthenticatedSupabase();
+            const authSupabase = getSupabaseClient();
 
             // USE FORCE DELETE (Bypasses RLS)
             const { data: success, error } = await authSupabase.rpc('force_delete_comment', {

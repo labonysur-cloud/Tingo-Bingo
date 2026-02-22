@@ -112,6 +112,29 @@ The platform enables users to share moments with their pets, connect with other 
 - **Media Types**: Images, videos, avatars
 - **Optimization**: Automatic image transformation and delivery
 
+### Security Architecture
+
+The platform uses a **Custom JWT bridge** between Firebase Auth and Supabase to enable true Row Level Security on all data, including real-time messaging:
+
+```mermaid
+sequenceDiagram
+    participant C as Client (Browser)
+    participant F as Firebase Auth
+    participant A as Next.js API
+    participant S as Supabase
+
+    C->>F: Login (Google/Email)
+    F-->>C: Firebase ID Token
+    C->>A: POST /api/auth/supabase-token
+    A->>A: Verify Firebase token
+    A->>A: Mint JWT (sub=firebaseUID, role=authenticated)
+    A-->>C: Supabase JWT
+    C->>S: All queries + realtime (with JWT)
+    S->>S: RLS: auth.uid() = firebaseUID ✅
+```
+
+> **How it works**: Firebase handles user authentication. The server verifies the Firebase token and mints a Supabase-compatible JWT signed with the project secret. Supabase then enforces Row Level Security using `auth.uid()` — ensuring users can only access their own data (messages, chats, etc.) at the database level.
+
 ---
 
 ## Tech Stack

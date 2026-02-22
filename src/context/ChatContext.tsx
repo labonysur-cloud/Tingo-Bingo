@@ -1,8 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "./AuthContext";
-import { supabase } from "@/lib/supabase"; // Use the public client for simplicity with our permissive RLS
+import { getSupabaseClient, getCurrentJwt } from "@/lib/supabase";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 
 export interface Message {
@@ -37,7 +37,7 @@ interface ChatContextType {
     isLoading: boolean;
     setActiveConversationId: (id: string | null) => void;
     sendMessage: (content: string, file?: File | null, mediaType?: 'image' | 'video' | 'gif', explicitChatId?: string) => Promise<void>;
-    startConversation: (userId: string) => Promise<string>; // Returns conversation ID
+    startConversation: (userId: string) => Promise<string>;
     refreshConversations: () => Promise<void>;
     onlineUsers: Set<string>;
 }
@@ -45,23 +45,25 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
-    const { user } = useAuth();
+    const { user, supabaseReady } = useAuth();
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [refreshMessages, setRefreshMessages] = useState(0); // Trigger to refetch messages
+    const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
 
-    // Real-time subscription ref
-    const subscriptionRef = useRef<any>(null);
+    // Get the authenticated Supabase client (re-evaluated when supabaseReady changes)
+    // This ensures we use the JWT-authenticated client for all operations
+    const client = useMemo(() => getSupabaseClient(), [supabaseReady]);
 
-    // 1. Fetch Conversations (using chats table)
-    const fetchConversations = async () => {
+    // ==========================================
+    // 1. Fetch Conversations
+    // ==========================================
+    const fetchConversations = useCallback(async () => {
         if (!user) return;
 
         try {
-            // Get all chats where user is a participant
-            const { data: chats, error: chatsError } = await supabase
+            const { data: chats, error: chatsError } = await client
                 .from('chats')
                 .select('*')
                 .or(`participant_1.eq.${user.id},participant_2.eq.${user.id}`)
@@ -75,20 +77,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            // Enrich with user details and last message
             const enrichedConversations = await Promise.all(chats.map(async (chat: any) => {
-                // Determine the other user
                 const otherUserId = chat.participant_1 === user.id ? chat.participant_2 : chat.participant_1;
 
-                // Fetch other user's data
-                const { data: userData } = await supabase
+                const { data: userData } = await client
                     .from('users')
                     .select('name, avatar')
                     .eq('id', otherUserId)
                     .single();
 
-                // Fetch last message
-                const { data: lastMsg } = await supabase
+                const { data: lastMsg } = await client
                     .from('messages')
                     .select('*')
                     .eq('chat_id', chat.id)
@@ -115,9 +113,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [user, client]);
 
-    // 2. Fetch Messages for Active Conversation
+    // ==========================================
+    // 2. Fetch Messages (runs ONCE per active conversation change)
+    // ==========================================
     useEffect(() => {
         if (!activeConversationId) {
             setMessages([]);
@@ -126,7 +126,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
         const fetchMessages = async () => {
             console.log('📥 Fetching messages for chat:', activeConversationId);
-            const { data, error } = await supabase
+            const { data, error } = await client
                 .from('messages')
                 .select('*')
                 .eq('chat_id', activeConversationId)
@@ -141,11 +141,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         };
 
         fetchMessages();
+    }, [activeConversationId, client]);
 
-        // Subscribe to NEW messages in this conversation
-        console.log('🔔 Setting up real-time subscription for chat:', activeConversationId);
+    // ==========================================
+    // 3. Realtime subscription for active conversation
+    //    Stable — NOT torn down on send
+    //    Uses authenticated client so RLS filters events
+    // ==========================================
+    useEffect(() => {
+        if (!activeConversationId || !supabaseReady) return;
 
-        const channel = supabase
+        console.log('🔔 Setting up authenticated realtime subscription for chat:', activeConversationId);
+
+        const channel = client
             .channel(`chat:${activeConversationId}`)
             .on('postgres_changes', {
                 event: 'INSERT',
@@ -155,15 +163,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             }, (payload) => {
                 console.log('🔔 Real-time message received:', payload);
                 const newMessage = payload.new as Message;
-                console.log('Adding message to UI:', newMessage);
+
+                // Deduplicate: only add if not already in state
                 setMessages(prev => {
-                    console.log('Previous messages:', prev.length);
-                    const updated = [...prev, newMessage];
-                    console.log('Updated messages:', updated.length);
-                    return updated;
+                    if (prev.some(m => m.id === newMessage.id)) {
+                        console.log('⏭️ Skipping duplicate message:', newMessage.id);
+                        return prev;
+                    }
+                    console.log('➕ Adding realtime message to UI:', newMessage.id);
+                    return [...prev, newMessage];
                 });
 
-                // Also update conversation last_message
+                // Update conversation last_message in sidebar
                 setConversations(prev => prev.map(c => {
                     if (c.id === activeConversationId) {
                         return { ...c, last_message: newMessage };
@@ -176,25 +187,84 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 if (err) console.error('🔔 Subscription error:', err);
             });
 
+        // Authenticate the realtime connection with our JWT
+        const jwt = getCurrentJwt();
+        if (jwt) {
+            client.realtime.setAuth(jwt);
+            console.log('🔐 Realtime auth set with Supabase JWT');
+        }
+
         return () => {
             console.log('🔕 Removing subscription for chat:', activeConversationId);
-            supabase.removeChannel(channel);
+            client.removeChannel(channel);
         };
-    }, [activeConversationId, refreshMessages]); // Refetch when refreshMessages changes
+    }, [activeConversationId, supabaseReady, client]);
 
-    // Initial load
+    // ==========================================
+    // 4. Global subscription for conversation list updates
+    //    RLS ensures we only receive events for our own chats
+    // ==========================================
+    useEffect(() => {
+        if (!user || !supabaseReady) return;
+
+        const globalChannel = client
+            .channel(`user-global-messages:${user.id}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+            }, (payload) => {
+                const newMessage = payload.new as Message;
+
+                // Update conversations list
+                setConversations(prev => {
+                    const chatExists = prev.some(c => c.id === newMessage.chat_id);
+                    if (chatExists) {
+                        return prev.map(c => {
+                            if (c.id === newMessage.chat_id) {
+                                return { ...c, last_message: newMessage };
+                            }
+                            return c;
+                        });
+                    }
+                    fetchConversations();
+                    return prev;
+                });
+            })
+            .subscribe((status, err) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('🌐 Global messages subscription active (secured by RLS)');
+                }
+                if (err) console.error('🌐 Global subscription error:', err);
+            });
+
+        // Authenticate the realtime connection
+        const jwt = getCurrentJwt();
+        if (jwt) {
+            client.realtime.setAuth(jwt);
+        }
+
+        return () => {
+            client.removeChannel(globalChannel);
+        };
+    }, [user, supabaseReady, client, fetchConversations]);
+
+    // ==========================================
+    // 5. Initial load
+    // ==========================================
     useEffect(() => {
         fetchConversations();
-    }, [user]);
+    }, [user, fetchConversations]);
 
-    // 3. Send Message
+    // ==========================================
+    // 6. Send Message (optimistic update, no refetch)
+    // ==========================================
     const sendMessage = async (content: string, file?: File | null, mediaType?: 'image' | 'video' | 'gif', explicitChatId?: string) => {
         const targetChatId = explicitChatId || activeConversationId;
 
         console.log('📤 sendMessage called');
         console.log('User:', user?.id);
         console.log('Target chat:', targetChatId);
-        console.log('Content:', content);
 
         if (!user || !targetChatId) {
             console.error('❌ Cannot send - missing user or chat ID');
@@ -217,9 +287,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 media_type: mediaType || (file ? 'image' : null)
             };
 
-            console.log('💾 Inserting message:', newMessage);
-
-            const { data, error } = await supabase
+            const { data, error } = await client
                 .from('messages')
                 .insert(newMessage)
                 .select();
@@ -231,24 +299,34 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             console.log('✅ Message inserted successfully:', data);
 
-            // Update chat timestamp
-            const { error: updateError } = await supabase
+            // Optimistic update with deduplication
+            if (data && data[0]) {
+                const sentMessage = data[0] as Message;
+                setMessages(prev => {
+                    if (prev.some(m => m.id === sentMessage.id)) return prev;
+                    return [...prev, sentMessage];
+                });
+
+                setConversations(prev => prev.map(c => {
+                    if (c.id === targetChatId) {
+                        return { ...c, last_message: sentMessage };
+                    }
+                    return c;
+                }));
+            }
+
+            // Update chat timestamp (uses correct targetChatId)
+            const { error: updateError } = await client
                 .from('chats')
                 .update({
                     updated_at: new Date().toISOString(),
                     last_message: content || 'Media'
                 })
-                .eq('id', activeConversationId);
+                .eq('id', targetChatId);
 
             if (updateError) {
                 console.error('⚠️ Chat update error:', updateError);
-            } else {
-                console.log('✅ Chat timestamp updated');
             }
-
-            // Manually refetch messages to show the new one immediately
-            console.log('🔄 Triggering message refresh...');
-            setRefreshMessages(prev => prev + 1);
 
         } catch (error) {
             console.error("❌ Error sending message:", error);
@@ -257,7 +335,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // 4. Start New Conversation
+    // ==========================================
+    // 7. Start New Conversation
+    // ==========================================
     const startConversation = async (targetUserId: string): Promise<string> => {
         if (!user) {
             console.warn("Attempted to start conversation without user");
@@ -265,19 +345,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            // Check existing locally first
             const existing = conversations.find(c =>
                 c.participants.some(p => p.user_id === targetUserId)
             );
 
             if (existing) {
-                console.log("Found existing chat:", existing.id);
                 setActiveConversationId(existing.id);
                 return existing.id;
             }
 
-            // Check if chat exists in database
-            const { data: existingChats } = await supabase
+            const { data: existingChats } = await client
                 .from('chats')
                 .select('id')
                 .or(`and(participant_1.eq.${user.id},participant_2.eq.${targetUserId}),and(participant_1.eq.${targetUserId},participant_2.eq.${user.id})`)
@@ -290,8 +367,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 return existingChats.id;
             }
 
-            // Create new chat
-            const { data: newChat, error } = await supabase
+            const { data: newChat, error } = await client
                 .from('chats')
                 .insert({
                     participant_1: user.id,
@@ -302,7 +378,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             if (error) throw error;
 
-            // Refresh list
             await fetchConversations();
             setActiveConversationId(newChat.id);
             return newChat.id;
@@ -314,18 +389,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const activeConversation = conversations.find(c => c.id === activeConversationId) || null;
 
-    const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-
-    // Presence Subscription
+    // ==========================================
+    // 8. Presence Subscription
+    // ==========================================
     useEffect(() => {
         if (!user) return;
 
-        const presenceChannel = supabase.channel('global-presence')
+        const presenceChannel = client.channel('global-presence')
             .on('presence', { event: 'sync' }, () => {
                 const newState = presenceChannel.presenceState();
                 const userIds = new Set<string>();
 
-                // Extract all user IDs from presence state
                 Object.keys(newState).forEach(key => {
                     newState[key].forEach((payload: any) => {
                         if (payload.user_id) userIds.add(payload.user_id);
@@ -344,11 +418,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             });
 
         return () => {
-            supabase.removeChannel(presenceChannel);
+            client.removeChannel(presenceChannel);
         };
-    }, [user]);
-
-    // ... existing message subscription code ...
+    }, [user, client]);
 
     return (
         <ChatContext.Provider value={{
@@ -361,7 +433,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             sendMessage,
             startConversation,
             refreshConversations: fetchConversations,
-            onlineUsers // Export this
+            onlineUsers
         }}>
             {children}
         </ChatContext.Provider>

@@ -1,35 +1,73 @@
-import { createClient } from '@supabase/supabase-js';
-import { auth } from './firebase';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-// Public client for all requests
+/**
+ * Public (anonymous) Supabase client.
+ * Used for operations that don't need auth (viewing public profiles, etc.)
+ * and as a fallback before the user is authenticated.
+ */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
- * Get Supabase client (simplified)
- * 
- * Since we can't easily integrate Firebase JWT with Supabase RLS,
- * we use permissive RLS policies and handle auth at the app level.
- * 
- * Security approach:
- * - Firebase Auth validates users (login/signup)
- * - App code checks user.id before operations
- * - RLS prevents direct database access (must go through app)
- * - This is acceptable for a social media app
+ * Create an authenticated Supabase client with a custom JWT.
+ * This JWT contains the Firebase UID as `sub`, enabling auth.uid() in RLS.
  */
-export async function getAuthenticatedSupabase() {
-    const user = auth.currentUser;
+export function createAuthenticatedClient(jwt: string): SupabaseClient {
+    return createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+            headers: {
+                Authorization: `Bearer ${jwt}`,
+            },
+        },
+        realtime: {
+            params: {
+                apikey: supabaseAnonKey,
+            },
+            headers: {
+                Authorization: `Bearer ${jwt}`,
+            },
+        },
+    });
+}
 
-    if (!user) {
-        console.warn('⚠️ No authenticated user');
-        return supabase;
-    }
+/**
+ * Singleton for the authenticated client.
+ * Updated when the user logs in and gets a Supabase JWT.
+ */
+let _authenticatedClient: SupabaseClient | null = null;
+let _currentJwt: string | null = null;
 
-    console.log('✅ User authenticated:', user.uid);
+/**
+ * Set the authenticated Supabase client with a new JWT.
+ * Called from AuthContext when a new token is minted.
+ */
+export function setAuthenticatedClient(jwt: string): SupabaseClient {
+    _currentJwt = jwt;
+    _authenticatedClient = createAuthenticatedClient(jwt);
+    return _authenticatedClient;
+}
 
-    // Return regular supabase client
-    // We handle user_id validation in our app code, not RLS
-    return supabase;
+/**
+ * Get the authenticated Supabase client.
+ * Falls back to the anonymous client if no JWT is available.
+ */
+export function getSupabaseClient(): SupabaseClient {
+    return _authenticatedClient || supabase;
+}
+
+/**
+ * Get the current JWT (for passing to realtime auth).
+ */
+export function getCurrentJwt(): string | null {
+    return _currentJwt;
+}
+
+/**
+ * Clear the authenticated client (on logout).
+ */
+export function clearAuthenticatedClient(): void {
+    _currentJwt = null;
+    _authenticatedClient = null;
 }
