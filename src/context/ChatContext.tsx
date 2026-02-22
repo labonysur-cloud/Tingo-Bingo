@@ -35,6 +35,7 @@ interface ChatContextType {
     activeConversation: Conversation | null;
     messages: Message[];
     isLoading: boolean;
+    supabaseReady: boolean;
     setActiveConversationId: (id: string | null) => void;
     sendMessage: (content: string, file?: File | null, mediaType?: 'image' | 'video' | 'gif', explicitChatId?: string) => Promise<void>;
     startConversation: (userId: string) => Promise<string>;
@@ -60,7 +61,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     // 1. Fetch Conversations
     // ==========================================
     const fetchConversations = useCallback(async () => {
-        if (!user) return;
+        if (!user || !supabaseReady) return;
 
         try {
             const { data: chats, error: chatsError } = await client
@@ -113,7 +114,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setIsLoading(false);
         }
-    }, [user, client]);
+    }, [user, client, supabaseReady]);
 
     // ==========================================
     // 2. Fetch Messages (runs ONCE per active conversation change)
@@ -339,8 +340,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     // 7. Start New Conversation
     // ==========================================
     const startConversation = async (targetUserId: string): Promise<string> => {
-        if (!user) {
-            console.warn("Attempted to start conversation without user");
+        if (!user || !supabaseReady) {
+            console.warn("Attempted to start conversation without user or before auth ready");
             return "";
         }
 
@@ -429,6 +430,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             activeConversation,
             messages,
             isLoading,
+            supabaseReady,
             setActiveConversationId,
             sendMessage,
             startConversation,

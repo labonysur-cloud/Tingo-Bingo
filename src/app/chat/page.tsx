@@ -316,35 +316,28 @@ function MessageBubble({ message }: { message: any }) {
 
 function ChatContent() {
     const searchParams = useSearchParams();
-    const { startConversation, isLoading } = useChat();
+    const { startConversation, isLoading, supabaseReady } = useChat();
     const userIdToStart = searchParams.get('user');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     useEffect(() => {
-        // Only attempt to start conversation if we have an authenticated user and the target ID
-        // The user check is handled within useChat(), but we need to wait for it here too
+        // Wait for supabaseReady before attempting to start a conversation
+        if (!userIdToStart || !supabaseReady) return;
+
         const initChat = async () => {
-            if (userIdToStart) {
-                try {
-                    await startConversation(userIdToStart);
-                    // Remove param from URL to prevent re-running
-                    const newUrl = new URL(window.location.href);
-                    newUrl.searchParams.delete('user');
-                    window.history.replaceState({}, '', newUrl.toString());
-                } catch (error) {
-                    console.error("Failed to auto-start chat:", error);
-                }
+            try {
+                await startConversation(userIdToStart);
+                // Remove param from URL to prevent re-running
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.delete('user');
+                window.history.replaceState({}, '', newUrl.toString());
+            } catch (error) {
+                console.error("Failed to auto-start chat:", error);
             }
         };
 
-        // We can check if 'isLoading' from chat context is false, but simplified check:
-        // We'll trust startConversation handling, but wrap in try-catch and wait a tick if needed
-        const timer = setTimeout(() => {
-            initChat();
-        }, 500); // Small delay to ensure auth state settles
-
-        return () => clearTimeout(timer);
-    }, [userIdToStart]);
+        initChat();
+    }, [userIdToStart, supabaseReady]);
 
     return (
         <div className="flex h-[calc(100vh-theme(spacing.16))] bg-white md:rounded-2xl md:shadow-soft md:border md:border-gray-100 overflow-hidden md:mx-4 md:mb-4">
