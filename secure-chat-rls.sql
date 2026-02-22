@@ -1,18 +1,20 @@
 -- ============================================
--- SECURE CHAT RLS POLICIES
+-- SECURE CHAT RLS POLICIES (Firebase UID Compatible)
 -- ============================================
 -- 
--- PURPOSE: Replace permissive USING(true) policies on chats/messages
--- with strict auth.uid() checks that use the custom JWT.
+-- PURPOSE: Replace policies that use auth.uid() (which requires UUID)
+-- with auth.jwt() ->> 'sub' (which handles any string format).
+--
+-- WHY: Firebase UIDs (e.g., "yPLT4tYbXKQOOt3mQrdwipHgXMA2") are NOT
+-- valid UUIDs. auth.uid() tries to parse sub as UUID and FAILS.
+-- auth.jwt() ->> 'sub' reads the raw string — works with any format.
 --
 -- PREREQUISITE: Your app must be minting Supabase JWTs with
 -- sub = Firebase UID. See /api/auth/supabase-token.
---
--- FIX: Cast auth.uid()::text because participant columns are text type
 -- ============================================
 
 -- ============================================
--- STEP 1: DROP OLD PERMISSIVE POLICIES
+-- STEP 1: DROP ALL EXISTING POLICIES ON CHATS & MESSAGES
 -- ============================================
 
 DO $$ 
@@ -46,38 +48,39 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
 -- STEP 3: CREATE STRICT POLICIES FOR CHATS
+-- Uses (auth.jwt() ->> 'sub') instead of auth.uid()
 -- ============================================
 
 CREATE POLICY "chat_select_participants"
     ON chats FOR SELECT
     USING (
-        participant_1 = auth.uid()::text OR 
-        participant_2 = auth.uid()::text
+        participant_1 = (auth.jwt() ->> 'sub') OR 
+        participant_2 = (auth.jwt() ->> 'sub')
     );
 
 CREATE POLICY "chat_insert_participants"
     ON chats FOR INSERT
     WITH CHECK (
-        participant_1 = auth.uid()::text OR 
-        participant_2 = auth.uid()::text
+        participant_1 = (auth.jwt() ->> 'sub') OR 
+        participant_2 = (auth.jwt() ->> 'sub')
     );
 
 CREATE POLICY "chat_update_participants"
     ON chats FOR UPDATE
     USING (
-        participant_1 = auth.uid()::text OR 
-        participant_2 = auth.uid()::text
+        participant_1 = (auth.jwt() ->> 'sub') OR 
+        participant_2 = (auth.jwt() ->> 'sub')
     )
     WITH CHECK (
-        participant_1 = auth.uid()::text OR 
-        participant_2 = auth.uid()::text
+        participant_1 = (auth.jwt() ->> 'sub') OR 
+        participant_2 = (auth.jwt() ->> 'sub')
     );
 
 CREATE POLICY "chat_delete_participants"
     ON chats FOR DELETE
     USING (
-        participant_1 = auth.uid()::text OR 
-        participant_2 = auth.uid()::text
+        participant_1 = (auth.jwt() ->> 'sub') OR 
+        participant_2 = (auth.jwt() ->> 'sub')
     );
 
 -- ============================================
@@ -91,8 +94,8 @@ CREATE POLICY "message_select_chat_participants"
             SELECT 1 FROM chats
             WHERE chats.id = messages.chat_id
             AND (
-                chats.participant_1 = auth.uid()::text OR 
-                chats.participant_2 = auth.uid()::text
+                chats.participant_1 = (auth.jwt() ->> 'sub') OR 
+                chats.participant_2 = (auth.jwt() ->> 'sub')
             )
         )
     );
@@ -100,20 +103,20 @@ CREATE POLICY "message_select_chat_participants"
 CREATE POLICY "message_insert_chat_participants"
     ON messages FOR INSERT
     WITH CHECK (
-        sender_id = auth.uid()::text AND
+        sender_id = (auth.jwt() ->> 'sub') AND
         EXISTS (
             SELECT 1 FROM chats
             WHERE chats.id = messages.chat_id
             AND (
-                chats.participant_1 = auth.uid()::text OR 
-                chats.participant_2 = auth.uid()::text
+                chats.participant_1 = (auth.jwt() ->> 'sub') OR 
+                chats.participant_2 = (auth.jwt() ->> 'sub')
             )
         )
     );
 
 CREATE POLICY "message_delete_sender"
     ON messages FOR DELETE
-    USING (sender_id = auth.uid()::text);
+    USING (sender_id = (auth.jwt() ->> 'sub'));
 
 -- ============================================
 -- STEP 5: VERIFY
