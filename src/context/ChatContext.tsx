@@ -109,8 +109,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             }));
 
             setConversations(enrichedConversations);
-        } catch (error) {
-            console.error("Error fetching conversations:", error);
+        } catch (error: any) {
+            console.error("Error fetching conversations:", error?.message || error?.code || JSON.stringify(error));
         } finally {
             setIsLoading(false);
         }
@@ -125,6 +125,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
+        if (!supabaseReady) return;
+
         const fetchMessages = async () => {
             console.log('📥 Fetching messages for chat:', activeConversationId);
             const { data, error } = await client
@@ -134,7 +136,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 .order('created_at', { ascending: true });
 
             if (error) {
-                console.error("❌ Error fetching messages:", error);
+                console.error("❌ Error fetching messages:", error?.message || error?.code || JSON.stringify(error));
             } else {
                 console.log('✅ Fetched messages:', data?.length);
                 setMessages(data || []);
@@ -142,7 +144,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         };
 
         fetchMessages();
-    }, [activeConversationId, client]);
+    }, [activeConversationId, client, supabaseReady]);
 
     // ==========================================
     // 3. Realtime subscription for active conversation
@@ -153,6 +155,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         if (!activeConversationId || !supabaseReady) return;
 
         console.log('🔔 Setting up authenticated realtime subscription for chat:', activeConversationId);
+
+        // Authenticate the realtime connection BEFORE subscribing
+        const jwt = getCurrentJwt();
+        if (jwt) {
+            client.realtime.setAuth(jwt);
+            console.log('🔐 Realtime auth set with Supabase JWT');
+        }
 
         const channel = client
             .channel(`chat:${activeConversationId}`)
@@ -188,13 +197,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 if (err) console.error('🔔 Subscription error:', err);
             });
 
-        // Authenticate the realtime connection with our JWT
-        const jwt = getCurrentJwt();
-        if (jwt) {
-            client.realtime.setAuth(jwt);
-            console.log('🔐 Realtime auth set with Supabase JWT');
-        }
-
         return () => {
             console.log('🔕 Removing subscription for chat:', activeConversationId);
             client.removeChannel(channel);
@@ -207,6 +209,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     // ==========================================
     useEffect(() => {
         if (!user || !supabaseReady) return;
+
+        // Authenticate the realtime connection BEFORE subscribing
+        const jwt = getCurrentJwt();
+        if (jwt) {
+            client.realtime.setAuth(jwt);
+        }
 
         const globalChannel = client
             .channel(`user-global-messages:${user.id}`)
@@ -238,12 +246,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 }
                 if (err) console.error('🌐 Global subscription error:', err);
             });
-
-        // Authenticate the realtime connection
-        const jwt = getCurrentJwt();
-        if (jwt) {
-            client.realtime.setAuth(jwt);
-        }
 
         return () => {
             client.removeChannel(globalChannel);
