@@ -60,12 +60,30 @@ export async function POST(req: NextRequest) {
                 url
             });
 
-            return webpush.sendNotification(pushSubscription, payload);
+            try {
+                await webpush.sendNotification(pushSubscription, payload);
+                return { success: true, endpoint: sub.endpoint };
+            } catch (err: any) {
+                console.error(`Push failed for endpoint ${sub.endpoint}:`, err.statusCode, err.message);
+                
+                // If the endpoint is no longer valid (status 410 or 404), remove it
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                    console.log(`Cleaning up expired subscription: ${sub.id}`);
+                    await supabase.from('push_subscriptions').delete().eq('id', sub.id);
+                }
+                throw err;
+            }
         }));
 
-        console.log(`Push attempted for user ${userId}. Successful: ${results.filter(r => r.status === 'fulfilled').length}`);
+        const succeeded = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+        
+        console.log(`Push Summary for user ${userId}: ${succeeded} succeeded, ${failed} failed`);
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ 
+            success: true, 
+            summary: { succeeded, failed } 
+        });
 
     } catch (error: any) {
         console.error('Push Dispatch Error:', error);

@@ -25,15 +25,15 @@ export async function POST(req: NextRequest) {
                 auth
             }, { onConflict: 'user_id,endpoint' });
 
-        if (!error) {
-           // Ensure the user record has push_enabled = true if it's currently unset
-           await supabase.from('users').update({ push_enabled: true }).eq('id', userId).is('push_enabled', null);
+        if (error) {
+            console.error('❌ Push Registration Database Error:', error.message, error.details);
+            return NextResponse.json({ error: `Database error: ${error.message}` }, { status: 500 });
         }
 
-        if (error) {
-            console.error('Database error saving subscription:', error);
-            throw error;
-        }
+        console.log('✅ Push subscription saved for user:', userId);
+        
+        // Ensure the user record has push_enabled = true if it's currently unset
+        await supabase.from('users').update({ push_enabled: true }).eq('id', userId).is('push_enabled', null);
 
         return NextResponse.json({ success: true });
 
