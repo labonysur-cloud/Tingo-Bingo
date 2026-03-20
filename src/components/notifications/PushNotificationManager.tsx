@@ -47,14 +47,7 @@ export default function PushNotificationManager() {
     };
 
     const subscribeToPush = async () => {
-        if (!user) {
-            alert('❌ Not logged in');
-            return;
-        }
-        if (!VAPID_PUBLIC_KEY) {
-            alert('❌ Missing VAPID key in environment');
-            return;
-        }
+        if (!user || !VAPID_PUBLIC_KEY) return;
         
         setIsSubscribing(true);
 
@@ -62,7 +55,7 @@ export default function PushNotificationManager() {
             console.log('--- STARTING PUSH REGISTRATION ---');
             
             if (!('serviceWorker' in navigator)) {
-                alert('❌ Service Workers not supported in this browser');
+                console.error('❌ Service Workers not supported in this browser');
                 return;
             }
 
@@ -107,16 +100,15 @@ export default function PushNotificationManager() {
             });
 
             if (res.ok) {
-                alert('✅ Notifications enabled successfully!');
+                console.log('✅ Notifications enabled successfully!');
                 setShowPrompt(false);
             } else {
                 const errData = await res.json();
-                alert(`❌ Server error: ${errData.error || 'Failed to register'}`);
+                console.error(`❌ Server error: ${errData.error || 'Failed to register'}`);
             }
 
         } catch (error: any) {
             console.error('Push subscription error:', error);
-            alert(`❌ Error enabling notifications: ${error.message || 'Unknown error'}`);
         } finally {
             setIsSubscribing(false);
         }
