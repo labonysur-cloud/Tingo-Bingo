@@ -183,7 +183,7 @@ export default function ZoothopiliaView() {
                             accept="image/*"
                             onChange={handleImageUpload}
                         />
-                        <p className="text-xs text-gray-400 text-center mt-2">Powered by HuggingFace Vision AI</p>
+                        <p className="text-xs text-gray-400 text-center mt-2">Powered by AI</p>
                     </div>
                 )}
 
