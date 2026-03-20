@@ -108,7 +108,26 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 };
             }));
 
-            setConversations(enrichedConversations);
+            // --- AI BOT INJECTION ---
+            const aiConversation: Conversation = {
+                id: 'ai-bot-conversation',
+                participants: [{
+                    user_id: 'ai-bot',
+                    user: {
+                        name: 'Zoothophilia AI',
+                        avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=zoo&backgroundColor=c0aede'
+                    }
+                }],
+                last_message: undefined
+            };
+
+            // Attempt to load last message from localStorage for the preview
+            try {
+                const localMsgs = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
+                if (localMsgs.length > 0) aiConversation.last_message = localMsgs[localMsgs.length - 1];
+            } catch(e) {}
+
+            setConversations([aiConversation, ...enrichedConversations]);
         } catch (error: any) {
             console.error("Error fetching conversations:", error?.message || error?.code || JSON.stringify(error));
         } finally {
@@ -122,6 +141,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (!activeConversationId) {
             setMessages([]);
+            return;
+        }
+
+        // --- AI BOT MEMORY LOAD ---
+        if (activeConversationId === 'ai-bot-conversation') {
+            try {
+                const localMsgs = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
+                setMessages(localMsgs);
+            } catch(e) {
+                setMessages([]);
+            }
             return;
         }
 
@@ -232,6 +262,74 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             console.error('❌ Cannot send - missing user or chat ID');
             return;
         }
+
+        // ---------- AI BOT INTERCEPT ----------
+        if (targetChatId === 'ai-bot-conversation') {
+            const userMsg: Message = {
+                id: crypto.randomUUID(),
+                chat_id: 'ai-bot-conversation',
+                sender_id: user.id,
+                content: content?.trim() || null,
+                media_url: null,
+                media_type: null,
+                created_at: new Date().toISOString(),
+                read_at: new Date().toISOString()
+            };
+            
+            // UI local update
+            setMessages(prev => [...prev, userMsg]);
+            
+            // Save to browser memory
+            const localMsgs = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
+            localMsgs.push(userMsg);
+            localStorage.setItem('ai_chat_history', JSON.stringify(localMsgs));
+
+            // Optimistically update conversation list last_message
+            setConversations(prev => prev.map(c => c.id === 'ai-bot-conversation' ? { ...c, last_message: userMsg } : c));
+
+            // Fetch AI Response! Send last 6 messages max for memory cost saving
+            const memorySlice = localMsgs.slice(-6).map((m: any) => ({
+                role: m.sender_id === 'ai-bot' ? 'assistant' : 'user',
+                content: m.content
+            }));
+
+            try {
+                const res = await fetch('/api/ai/chat/bot', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({
+                         history: memorySlice,
+                         message: content
+                     })
+                });
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error || 'Failed AI response');
+
+                const aiMsg: Message = {
+                    id: crypto.randomUUID(),
+                    chat_id: 'ai-bot-conversation',
+                    sender_id: 'ai-bot',
+                    content: data.response,
+                    media_url: null,
+                    media_type: null,
+                    created_at: new Date().toISOString(),
+                    read_at: new Date().toISOString()
+                };
+                
+                setMessages(prev => [...prev, aiMsg]);
+                localMsgs.push(aiMsg);
+                localStorage.setItem('ai_chat_history', JSON.stringify(localMsgs));
+
+                setConversations(prev => prev.map(c => c.id === 'ai-bot-conversation' ? { ...c, last_message: aiMsg } : c));
+
+            } catch(e) {
+                console.error("AI DM error:", e);
+                alert("AI failed to respond. Check API keys or permissions.");
+            }
+            return;
+        }
+        // --------------------------------------
 
         try {
             let mediaUrl = null;
