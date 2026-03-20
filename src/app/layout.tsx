@@ -7,6 +7,7 @@ import { ChatProvider } from "@/context/ChatContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import BottomNav from "@/components/layout/BottomNav";
 import { Toaster } from "@/components/ui/Toaster";
+import PushNotificationManager from "@/components/notifications/PushNotificationManager";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -64,6 +65,7 @@ export default function RootLayout({
                 {children}
                 <BottomNav />
                 <Toaster />
+                <PushNotificationManager />
               </NotificationProvider>
             </ChatProvider>
           </SocialProvider>

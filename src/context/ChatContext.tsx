@@ -388,6 +388,21 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 console.error('⚠️ Chat update error:', updateError);
             }
 
+            // --- PUSH NOTIFICATION DISPATCH ---
+            const otherParticipant = activeConversation?.participants?.find(p => p.user_id !== user.id);
+            if (otherParticipant && otherParticipant.user_id !== 'ai-bot') {
+                fetch('/api/notifications/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: otherParticipant.user_id,
+                        title: `New message from ${user.name || 'Someone'}`,
+                        body: content || "Sent you an image",
+                        url: `/chat?id=${targetChatId}`
+                    })
+                }).catch(err => console.error('Failed to dispatch push:', err));
+            }
+
         } catch (error) {
             console.error("❌ Error sending message:", error);
             alert(`Failed to send message: ${error}`);
