@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
                         ]
                     }
                 ],
-                model: "llama-3.2-90b-vision-preview",
+                model: "meta-llama/llama-4-scout-17b-16e-instruct",
                 temperature: 0.5,
                 max_tokens: 150,
             });
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
             return NextResponse.json({
                 description: description,
-                modelUsed: "llama-3.2-90b-vision-preview (Groq)"
+                modelUsed: "meta-llama/llama-4-scout-17b-16e-instruct (Groq)"
             });
 
         } catch (err: any) {
