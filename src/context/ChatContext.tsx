@@ -64,6 +64,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         if (!user || !supabaseReady) return;
 
         try {
+            // --- AI BOT INJECTION (Always Visible) ---
+            const aiConversation: Conversation = {
+                id: 'ai-bot-conversation',
+                participants: [{
+                    user_id: 'ai-bot',
+                    user: {
+                        name: 'Zoothophilia AI',
+                        avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=zoo&backgroundColor=c0aede'
+                    }
+                }],
+                last_message: undefined
+            };
+
+            // Attempt to load last message from localStorage for the preview
+            try {
+                const localMsgs = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
+                if (localMsgs.length > 0) aiConversation.last_message = localMsgs[localMsgs.length - 1];
+            } catch(e) {}
+
             const { data: chats, error: chatsError } = await client
                 .from('chats')
                 .select('*')
@@ -73,7 +92,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             if (chatsError) throw chatsError;
 
             if (!chats || chats.length === 0) {
-                setConversations([]);
+                setConversations([aiConversation]);
                 setIsLoading(false);
                 return;
             }
@@ -107,25 +126,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     last_message: lastMsg || undefined
                 };
             }));
-
-            // --- AI BOT INJECTION ---
-            const aiConversation: Conversation = {
-                id: 'ai-bot-conversation',
-                participants: [{
-                    user_id: 'ai-bot',
-                    user: {
-                        name: 'Zoothophilia AI',
-                        avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=zoo&backgroundColor=c0aede'
-                    }
-                }],
-                last_message: undefined
-            };
-
-            // Attempt to load last message from localStorage for the preview
-            try {
-                const localMsgs = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
-                if (localMsgs.length > 0) aiConversation.last_message = localMsgs[localMsgs.length - 1];
-            } catch(e) {}
 
             setConversations([aiConversation, ...enrichedConversations]);
         } catch (error: any) {
