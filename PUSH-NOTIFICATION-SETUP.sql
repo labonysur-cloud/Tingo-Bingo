@@ -1,4 +1,5 @@
 -- 1. Create table for storing browser push subscriptions
+DROP TABLE IF EXISTS public.push_subscriptions;
 CREATE TABLE IF NOT EXISTS public.push_subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
