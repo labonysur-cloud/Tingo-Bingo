@@ -34,6 +34,15 @@ export async function POST(req: NextRequest) {
 
     } catch (error: any) {
         console.error('Groq TTS Error:', error);
+        
+        // Handle Groq terms of service error for partner models
+        if (error.message?.includes('model_terms_required') || error.error?.error?.code === 'model_terms_required') {
+             return NextResponse.json(
+                { error: 'You need to accept the Orpheus Voice Terms of Use on your Groq Console first! Visit console.groq.com/models' },
+                { status: 403 }
+            );
+        }
+
         return NextResponse.json(
             { error: error.message || 'Failed to generate speech' },
             { status: 500 }
