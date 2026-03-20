@@ -9,6 +9,10 @@ export default function ZoothopiliaView() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [result, setResult] = useState<string | null>(null);
 
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [healthQuery, setHealthQuery] = useState("");
 
@@ -101,34 +105,96 @@ export default function ZoothopiliaView() {
         }
     };
 
-    // 3. Translator (Chat + Mock Input)
-    const handleTranslate = async () => {
-        setIsAnalyzing(true);
-        setResult(null);
+    // 3. Translator (Real STT + AI + TTS)
+    const toggleRecording = async () => {
+        if (isRecording) {
+            // Stop recording
+            mediaRecorderRef.current?.stop();
+            setIsRecording(false);
+            return;
+        }
 
-        // Simulate "Listening"
-        await new Promise(r => setTimeout(r, 2000));
-
+        // Start recording
         try {
-            const sounds = ["Happy Bark", "Angry Hiss", "Confused Meow", "Excited Whimper", "Chirping Bird"];
-            const randomSound = sounds[Math.floor(Math.random() * sounds.length)];
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
 
-            const res = await fetch('/api/ai/chat', {
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                stream.getTracks().forEach(track => track.stop()); // cleanup
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                await processAudio(audioBlob);
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setResult(null);
+        } catch (err) {
+            console.error(err);
+            alert("Microphone access denied or error occurred.");
+        }
+    };
+
+    const processAudio = async (audioBlob: Blob) => {
+        setIsAnalyzing(true);
+        try {
+            // 1. Transcribe audio using STT (Whisper)
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'audio.webm');
+            
+            const transcribeRes = await fetch('/api/ai/transcribe', {
+                method: 'POST',
+                body: formData
+            });
+            const transcribeData = await transcribeRes.json();
+            if (!transcribeRes.ok) throw new Error(transcribeData.error || 'Failed to transcribe');
+            
+            const userText = transcribeData.text;
+
+            if (!userText || userText.trim().length === 0) {
+                alert("Couldn't hear anything, please try again!");
+                setIsAnalyzing(false);
+                return;
+            }
+
+            // 2. Generate pet translation using LLM (Llama)
+            const chatRes = await fetch('/api/ai/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: `Translate this animal sound: ${randomSound}`,
+                    message: `The user/pet said: "${userText}". Translate this playfully into pet speech or interpret the pet sound.`,
                     context: 'translator'
                 })
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            const chatData = await chatRes.json();
+            if (!chatRes.ok) throw new Error(chatData.error || 'Failed to generate response');
+            
+            const aiResponse = chatData.response;
+            setResult(`🎤 Heard: "${userText}"\n\n${aiResponse}`);
 
-            setResult(`🎤 Heard: ${randomSound}\n\n${data.response}`);
+            // 3. Speak the translation using TTS (Orpheus)
+            const ttsRes = await fetch('/api/ai/speak', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: aiResponse })
+            });
+            if (!ttsRes.ok) throw new Error('Failed to generate audio');
+            
+            const audioBlobRet = await ttsRes.blob();
+            const audioUrl = URL.createObjectURL(audioBlobRet);
+            const audio = new Audio(audioUrl);
+            audio.play();
+
         } catch (error: any) {
-            alert("Error: " + error.message);
+             console.error(error);
+             alert("Error processing audio: " + error.message);
         } finally {
-            setIsAnalyzing(false);
+             setIsAnalyzing(false);
         }
     };
 
@@ -212,13 +278,16 @@ export default function ZoothopiliaView() {
                 {activeTab === "translator" && !result && (
                     <div className="w-full animate-in fade-in zoom-in duration-300">
                         <div
-                            onClick={handleTranslate}
-                            className="w-32 h-32 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-8 cursor-pointer hover:bg-red-100 transition-colors active:scale-95 ring-4 ring-red-50 animate-pulse"
+                            onClick={toggleRecording}
+                            className={`w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-8 cursor-pointer transition-colors active:scale-95 ring-4 
+                                ${isRecording ? 'bg-red-500 ring-red-200 animate-pulse' : 'bg-red-50 hover:bg-red-100 ring-red-50'}`}
                         >
-                            <Mic className="w-12 h-12 text-red-500" />
+                            <Mic className={`w-12 h-12 ${isRecording ? 'text-white' : 'text-red-500'}`} />
                         </div>
-                        <p className="font-bold text-gray-800">Tap to Listen</p>
-                        <p className="text-xs text-gray-400 mt-2">We'll interpret what your pet is saying!</p>
+                        <p className="font-bold text-gray-800">
+                            {isRecording ? "Listening... Tap to Stop" : "Tap to Speak"}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-2">Speak to your pet, or let your pet speak!</p>
                     </div>
                 )}
 
