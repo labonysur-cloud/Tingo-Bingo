@@ -21,7 +21,19 @@ export async function POST(req: NextRequest) {
 
         const supabase = getSupabaseClient();
         
-        // Fetch all subscriptions for this user
+        // 1. Check if user has notifications enabled in their profile
+        const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('push_enabled')
+            .eq('id', userId)
+            .single();
+
+        if (userError) throw userError;
+        if (userData && userData.push_enabled === false) {
+            return NextResponse.json({ success: true, message: 'User has disabled push notifications' });
+        }
+
+        // 2. Fetch all subscriptions for this user
         const { data: subscriptions, error } = await supabase
             .from('push_subscriptions')
             .select('*')

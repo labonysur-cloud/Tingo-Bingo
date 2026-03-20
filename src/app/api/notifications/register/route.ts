@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
         const { endpoint, keys } = subscription;
         const { p256dh, auth } = keys;
 
+        // Upsert subscription
         const { error } = await supabase
             .from('push_subscriptions')
             .upsert({
@@ -23,6 +24,11 @@ export async function POST(req: NextRequest) {
                 p256dh,
                 auth
             }, { onConflict: 'user_id,endpoint' });
+
+        if (!error) {
+           // Ensure the user record has push_enabled = true if it's currently unset
+           await supabase.from('users').update({ push_enabled: true }).eq('id', userId).is('push_enabled', null);
+        }
 
         if (error) {
             console.error('Database error saving subscription:', error);

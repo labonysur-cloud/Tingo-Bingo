@@ -7,7 +7,7 @@ import { auth } from "@/lib/firebase";
 import { supabase } from "@/lib/supabase";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { updateProfile } from "firebase/auth";
-import { ArrowLeft, Camera, Loader2, Save, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, Save, Plus, Trash2, Bell, BellOff } from "lucide-react";
 import Link from "next/link";
 
 export default function EditProfilePage() {
@@ -27,6 +27,7 @@ export default function EditProfilePage() {
     const [location, setLocation] = useState("");
     const [avatar, setAvatar] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar || null);
+    const [pushEnabled, setPushEnabled] = useState(true);
 
     // Form State - Pets (Multi-Pet System)
     const [myPets, setMyPets] = useState<any[]>([]);
@@ -62,6 +63,7 @@ export default function EditProfilePage() {
                     setBio(userData.bio || "");
                     setLocation(userData.location || "");
                     setAvatarPreview(prev => userData.avatar || prev);
+                    setPushEnabled(userData.push_enabled !== false); // Default to true if null or true
                 }
 
                 // 2. Get All Pets
@@ -206,6 +208,7 @@ export default function EditProfilePage() {
                     bio,
                     location,
                     avatar: photoURL,
+                    push_enabled: pushEnabled,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', user.id)
@@ -543,6 +546,36 @@ export default function EditProfilePage() {
                                 className="modern-input"
                                 placeholder="City, Country"
                             />
+                        </div>
+                    </div>
+                    
+                    {/* NOTIFICATION SETTINGS SECTION */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-purple-100 ring-4 ring-purple-50/50">
+                        <div className="flex items-center gap-3 border-b border-gray-100 pb-2 mb-4">
+                            <div className="w-2 h-8 bg-purple-500 rounded-full"></div>
+                            <h2 className="font-bold text-xl text-gray-900">Notification Settings</h2>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-2">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${pushEnabled ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-400'}`}>
+                                    {pushEnabled ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+                                </div>
+                                <div>
+                                    <p className="font-bold text-gray-900">Push Notifications</p>
+                                    <p className="text-xs text-gray-500">Receive alerts for new messages and pet updates</p>
+                                </div>
+                            </div>
+                            
+                            <button
+                                type="button"
+                                onClick={() => setPushEnabled(!pushEnabled)}
+                                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ring-2 ring-offset-2 ${pushEnabled ? 'bg-purple-600 ring-purple-500' : 'bg-gray-200 ring-gray-100'}`}
+                            >
+                                <span
+                                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${pushEnabled ? 'translate-x-6' : 'translate-x-1'}`}
+                                />
+                            </button>
                         </div>
                     </div>
 
