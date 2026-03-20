@@ -11,8 +11,17 @@ export default function PushNotificationManager() {
     const [permission, setPermission] = useState<NotificationPermission>('default');
     const [isSubscribing, setIsSubscribing] = useState(false);
     const [showPrompt, setShowPrompt] = useState(false);
+    const [isIOS, setIsIOS] = useState(false);
+    const [isPWA, setIsPWA] = useState(false);
 
     useEffect(() => {
+        // Detect iOS and PWA status
+        const ua = window.navigator.userAgent;
+        const ios = /iPad|iPhone|iPod/.test(ua);
+        const pwa = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+        setIsIOS(ios);
+        setIsPWA(pwa);
+
         if ('Notification' in window) {
             setPermission(Notification.permission);
             if (Notification.permission === 'default') {
@@ -38,24 +47,49 @@ export default function PushNotificationManager() {
     };
 
     const subscribeToPush = async () => {
-        if (!user || !VAPID_PUBLIC_KEY) return;
+        if (!user) {
+            alert('❌ Not logged in');
+            return;
+        }
+        if (!VAPID_PUBLIC_KEY) {
+            alert('❌ Missing VAPID key in environment');
+            return;
+        }
+        
         setIsSubscribing(true);
 
         try {
+            console.log('--- STARTING PUSH REGISTRATION ---');
+            
+            if (!('serviceWorker' in navigator)) {
+                alert('❌ Service Workers not supported in this browser');
+                return;
+            }
+
             const permission = await Notification.requestPermission();
+            console.log('Permission status:', permission);
             setPermission(permission);
 
             if (permission !== 'granted') {
+                alert('⚠️ Notification permission was denied. Please enable it in your browser settings.');
                 setShowPrompt(false);
                 return;
             }
 
+            console.log('Registering SW...');
             const registration = await navigator.serviceWorker.register('/sw.js');
+            console.log('SW Registered:', registration);
             
+            // Wait for SW to be active
+            await navigator.serviceWorker.ready;
+            console.log('SW Ready');
+
+            console.log('Subscribing to pushManager...');
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
             });
+            console.log('Subscription object:', subscription);
 
             // Parse subscription for the backend
             const subJSON = JSON.parse(JSON.stringify(subscription));
@@ -73,14 +107,16 @@ export default function PushNotificationManager() {
             });
 
             if (res.ok) {
-                console.log('Push subscription successful');
+                alert('✅ Notifications enabled successfully!');
                 setShowPrompt(false);
             } else {
-                console.error('Failed to register subscription on backend');
+                const errData = await res.json();
+                alert(`❌ Server error: ${errData.error || 'Failed to register'}`);
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Push subscription error:', error);
+            alert(`❌ Error enabling notifications: ${error.message || 'Unknown error'}`);
         } finally {
             setIsSubscribing(false);
         }
@@ -103,7 +139,9 @@ export default function PushNotificationManager() {
                 <div>
                     <h3 className="font-bold text-gray-900">Don't miss a message!</h3>
                     <p className="text-sm text-gray-500 leading-relaxed">
-                        Enable notifications to get real-time alerts for chats and pet updates.
+                        {isIOS && !isPWA 
+                            ? "On iPhone, you MUST tap 'Share' -> 'Add to Home Screen' to enable notifications." 
+                            : "Enable notifications to get real-time alerts for chats and pet updates."}
                     </p>
                 </div>
             </div>
