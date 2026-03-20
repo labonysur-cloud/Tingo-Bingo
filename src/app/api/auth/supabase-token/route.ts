@@ -79,6 +79,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Mint a Supabase-compatible JWT
+        // Supabase validates JWTs using the raw secret string encoded as UTF-8 bytes.
+        // Do NOT base64-decode the secret — pass it as-is to TextEncoder.
         const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET);
 
         const supabaseJwt = await new SignJWT({

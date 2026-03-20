@@ -244,7 +244,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             const newMessage = {
                 chat_id: targetChatId,
                 sender_id: user.id,
-                content: content || null,
+                content: content?.trim() || null,
                 media_url: mediaUrl,
                 media_type: mediaType || (file ? 'image' : null)
             };
