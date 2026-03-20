@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Camera, Bot, Mic, Upload, Activity } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
 
 export default function ZoothopiliaView() {
     const [activeTab, setActiveTab] = useState<"breed" | "health" | "translator">("breed");
@@ -231,8 +232,8 @@ export default function ZoothopiliaView() {
                             <h3 className="text-lg font-bold text-gray-900">Analysis Complete</h3>
                         </div>
 
-                        <div className="bg-gray-50 p-5 rounded-2xl text-left font-medium text-gray-700 text-sm leading-relaxed mb-6 border border-gray-100">
-                            {result}
+                        <div className="bg-gray-50 p-5 rounded-2xl text-left font-medium text-gray-700 text-sm leading-relaxed mb-6 border border-gray-100 [&>p]:mb-3 [&>ul]:list-disc [&>ul]:ml-4 [&>ul]:mb-3 [&>ol]:list-decimal [&>ol]:ml-4 [&>ol]:mb-3 [&>strong]:text-gray-900">
+                            <ReactMarkdown>{result}</ReactMarkdown>
                         </div>
 
                         <button onClick={() => setResult(null)} className="text-primary font-bold text-sm hover:underline">Start Over</button>
