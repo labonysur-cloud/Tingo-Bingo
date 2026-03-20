@@ -22,4 +22,4 @@ DROP POLICY IF EXISTS "Users can manage own subs" ON public.push_subscriptions;
 CREATE POLICY "Users can manage own subs" 
 ON public.push_subscriptions 
 FOR ALL 
-USING (auth.uid() = user_id);
+USING (user_id = (current_setting('request.jwt.claims', true)::json->>'sub'));
